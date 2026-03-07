@@ -48,14 +48,14 @@ export default function HomePage() {
 
       <div
         className={cn(
-          "w-full transition-all duration-500 motion-reduce:transition-none",
+          "w-full transition-all duration-500 ease-out motion-reduce:transition-none",
           isActive
             ? "max-w-6xl pt-8"
             : "flex min-h-screen max-w-3xl flex-col items-center justify-center",
         )}
       >
         {!isActive && (
-          <div className="mb-10 text-center">
+          <div className="mb-10 text-center animate-in fade-in duration-300 motion-reduce:animate-none">
             <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
               Sift
             </h1>
@@ -79,7 +79,12 @@ export default function HomePage() {
           </div>
         )}
 
-        <div className={cn(isActive && "mx-auto max-w-3xl")}>
+        <div
+          className={cn(
+            "w-full transition-all duration-500 ease-out motion-reduce:transition-none",
+            isActive ? "mx-auto max-w-3xl" : "",
+          )}
+        >
           <SearchBar
             ref={searchInputRef}
             onSubmit={handleSubmit}
@@ -88,7 +93,7 @@ export default function HomePage() {
         </div>
 
         {isActive && (
-          <div className="mt-6 w-full">
+          <div className="mt-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none">
             <ResearchView
               phase={phase}
               tokens={tokens}

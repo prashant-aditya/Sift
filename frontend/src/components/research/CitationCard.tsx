@@ -37,8 +37,10 @@ export const CitationCard = forwardRef<HTMLAnchorElement, CitationCardProps>(
         <div className="flex items-start gap-2.5">
           <span
             className={cn(
-              "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white",
-              sourceConfig?.bgClass ?? "bg-primary",
+              "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+              sourceConfig?.bgClass
+                ? `${sourceConfig.bgClass} text-white`
+                : "bg-primary text-primary-foreground",
             )}
             aria-hidden="true"
           >

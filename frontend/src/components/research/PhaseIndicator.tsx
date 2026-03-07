@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { BrainCircuit, Search, Cog, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResearchPhase } from "@/types/research";
@@ -41,60 +40,28 @@ function getPhaseConfig(
 }
 
 export function PhaseIndicator({ phase, sourcesActive }: PhaseIndicatorProps) {
-  const [visible, setVisible] = useState(false);
-  const [currentConfig, setCurrentConfig] = useState<PhaseConfig | null>(null);
+  const config = getPhaseConfig(phase, sourcesActive);
 
-  const prefersReducedMotion =
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (!config) return null;
 
-  useEffect(() => {
-    const config = getPhaseConfig(phase, sourcesActive);
-
-    if (!config) {
-      setVisible(false);
-      if (prefersReducedMotion) {
-        setCurrentConfig(null);
-      } else {
-        const timeout = setTimeout(() => setCurrentConfig(null), 200);
-        return () => clearTimeout(timeout);
-      }
-      return;
-    }
-
-    if (prefersReducedMotion) {
-      setCurrentConfig(config);
-      setVisible(true);
-    } else {
-      setVisible(false);
-      const timeout = setTimeout(() => {
-        setCurrentConfig(config);
-        setVisible(true);
-      }, 150);
-      return () => clearTimeout(timeout);
-    }
-  }, [phase, sourcesActive, prefersReducedMotion]);
-
-  if (!currentConfig) return null;
-
-  const Icon = currentConfig.icon;
+  const Icon = config.icon;
 
   return (
     <div
+      key={phase}
       role="status"
       aria-live="polite"
       aria-atomic="true"
       className={cn(
         "flex items-center gap-2 text-sm text-muted-foreground",
-        "transition-opacity duration-200 motion-reduce:transition-none",
-        visible ? "opacity-100" : "opacity-0 motion-reduce:opacity-100",
+        "animate-in fade-in duration-200 motion-reduce:animate-none",
       )}
     >
       <Icon
         className="size-4 animate-pulse motion-reduce:animate-none"
         aria-hidden="true"
       />
-      <span>{currentConfig.label}</span>
+      <span>{config.label}</span>
     </div>
   );
 }

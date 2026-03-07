@@ -13,7 +13,6 @@ export class ApiError extends Error {
 
 function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
-  // Phase 2: Supabase session token will be retrieved here
   return null;
 }
 

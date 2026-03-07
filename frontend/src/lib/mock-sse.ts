@@ -153,9 +153,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function* generateMockEvents(
-  _body: unknown,
-): AsyncGenerator<string> {
+async function* generateMockEvents(): AsyncGenerator<string> {
   yield formatSSE("status", {
     phase: "decomposing",
     message: "Analyzing your query and breaking it into sub-questions...",
@@ -214,13 +212,13 @@ async function* generateMockEvents(
   });
 }
 
-export function createMockResponse(body: unknown): Response {
+export function createMockResponse(): Response {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of generateMockEvents(body)) {
+        for await (const chunk of generateMockEvents()) {
           controller.enqueue(encoder.encode(chunk));
         }
         controller.close();

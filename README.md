@@ -255,16 +255,16 @@ The frontend is developed independently from the backend. Where the backend isn'
 **Goal:** Frontend containerizable. Build passes for Vercel. Core hooks have unit tests.
 
 **Morning — Docker + Build:**
-- [ ] Create `frontend/Dockerfile`:
+- [x] Create `frontend/Dockerfile`:
   ```dockerfile
-  FROM node:18-alpine AS builder
+  FROM node:20-alpine AS builder
   WORKDIR /app
   COPY package.json package-lock.json ./
   RUN npm ci
   COPY . .
   RUN npm run build
 
-  FROM node:18-alpine AS runner
+  FROM node:20-alpine AS runner
   WORKDIR /app
   ENV NODE_ENV=production
   COPY --from=builder /app/public ./public
@@ -273,14 +273,14 @@ The frontend is developed independently from the backend. Where the backend isn'
   EXPOSE 3000
   CMD ["node", "server.js"]
   ```
-- [ ] Add `output: 'standalone'` to `next.config.js` (for Docker)
-- [ ] Verify: `npm run build` passes cleanly
-- [ ] Verify: `docker build -t sift-frontend .` succeeds
+- [x] Add `output: 'standalone'` to `next.config.ts` (for Docker)
+- [x] Verify: `npm run build` passes cleanly
+- [x] Verify: `docker build -t sift-frontend .` succeeds
 
 **Afternoon — Frontend Tests:**
-- [ ] Install: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
-- [ ] Configure `vitest.config.ts`
-- [ ] Write tests:
+- [x] Install: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
+- [x] Configure `vitest.config.ts`
+- [x] Write tests:
   | Test | What it validates |
   |------|-------------------|
   | `SearchBar.test.tsx` | Submit emits correct query + sources; validation rejects <3 chars; disabled while streaming |
@@ -289,13 +289,13 @@ The frontend is developed independently from the backend. Where the backend isn'
   | `useResearch.test.ts` | State transitions through all phases; tokens accumulate; citations populated on complete |
   | `CitationCard.test.tsx` | Renders title, URL, source icon; highlight animation triggers |
   | `SourceIndicator.test.tsx` | Shows correct state for waiting/searching/done/error |
-- [ ] Setup CI-compatible test command: `npx vitest run`
+- [x] Setup CI-compatible test command: `npx vitest run`
 
 **Checkpoint:**
-- [ ] `npm run build` — zero errors
-- [ ] `docker build` — succeeds
-- [ ] `npx vitest run` — all tests pass
-- [ ] All tests run without backend dependency (mocked)
+- [x] `npm run build` — zero errors
+- [x] `docker build` — succeeds
+- [x] `npx vitest run` — all tests pass (42 tests across 6 files)
+- [x] All tests run without backend dependency (mocked)
 
 ---
 
@@ -303,28 +303,28 @@ The frontend is developed independently from the backend. Where the backend isn'
 
 **Goal:** Phase 1 complete. No rough edges. Ready to build on.
 
-- [ ] Fix any failing tests or visual bugs from the week
-- [ ] Test full flow with mock SSE and (if available) real backend
-- [ ] Ensure `SearchBar` → `ResearchView` transition animation is smooth
-- [ ] Review code: remove TODO comments, clean up unused imports
-- [ ] Verify dark mode one final time across all components
-- [ ] `npm run lint` — zero warnings
+- [x] Fix any failing tests or visual bugs from the week
+- [x] Test full flow with mock SSE and (if available) real backend
+- [x] Ensure `SearchBar` → `ResearchView` transition animation is smooth
+- [x] Review code: remove TODO comments, clean up unused imports
+- [x] Verify dark mode one final time across all components
+- [x] `npm run lint` — zero warnings
 
 **Checkpoint:**
-- [ ] Phase 1 exit criteria met (below)
+- [x] Phase 1 exit criteria met (below)
 
 ---
 
 ### Phase 1 Exit Criteria
 
-- [ ] All 7 days completed
-- [ ] Full research flow works: query → phases → sources → streamed answer → citations
-- [ ] Responsive on mobile (375px) through desktop (1440px)
-- [ ] Dark mode fully functional
-- [ ] Accessible: keyboard navigable, aria labels, reduced motion
-- [ ] Core hooks and components have unit tests
-- [ ] `npm run build` and `docker build` both pass
-- [ ] Works with mock SSE (no backend dependency for development)
+- [x] All 7 days completed
+- [x] Full research flow works: query → phases → sources → streamed answer → citations
+- [x] Responsive on mobile (375px) through desktop (1440px)
+- [x] Dark mode fully functional
+- [x] Accessible: keyboard navigable, aria labels, reduced motion
+- [x] Core hooks and components have unit tests
+- [x] `npm run build` and `docker build` both pass
+- [x] Works with mock SSE (no backend dependency for development)
 
 ---
 ---

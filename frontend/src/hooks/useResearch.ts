@@ -172,20 +172,12 @@ export function useResearch(): UseResearchReturn {
     [],
   );
 
-  const sseBodyRef = useRef<unknown>(null);
-  const sseUrlRef = useRef("");
-
   const { start: sseStart, abort: sseAbort, isConnected } = useSSE({
-    url: sseUrlRef.current,
+    url: "",
     method: "POST",
-    body: sseBodyRef.current,
     onEvent: handleEvent,
     onOpen: () => setPhase("decomposing"),
-    onClose: () => {
-      if (phase !== "complete" && phase !== "error") {
-        // Stream ended without explicit complete/error — leave as-is
-      }
-    },
+    onClose: () => {},
   });
 
   const resetState = useCallback(() => {
@@ -207,10 +199,10 @@ export function useResearch(): UseResearchReturn {
       setSourceStatuses(buildInitialSourceStatuses(sources));
       setPhase("decomposing");
 
-      sseUrlRef.current = sseUrl("/api/v1/research");
-      sseBodyRef.current = { query, sources, depth };
-
-      setTimeout(() => sseStart(), 0);
+      sseStart({
+        url: sseUrl("/api/v1/research"),
+        body: { query, sources, depth },
+      });
     },
     [sseStart, sseAbort, resetState],
   );
@@ -226,10 +218,10 @@ export function useResearch(): UseResearchReturn {
       tokensRef.current = "";
       setPhase("decomposing");
 
-      sseUrlRef.current = sseUrl(`/api/v1/research/${sid}/followup`);
-      sseBodyRef.current = { query };
-
-      setTimeout(() => sseStart(), 0);
+      sseStart({
+        url: sseUrl(`/api/v1/research/${sid}/followup`),
+        body: { query },
+      });
     },
     [sseStart, sseAbort],
   );
