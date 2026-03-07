@@ -21,13 +21,22 @@ export function SourceToggle({
   return (
     <button
       type="button"
+      role="switch"
       aria-pressed={active}
+      aria-checked={active}
       aria-label={`Toggle ${source.displayName} source`}
       disabled={disabled}
       onClick={() => onToggle(source.name)}
+      onKeyDown={(e) => {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          onToggle(source.name);
+        }
+      }}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium",
-        "transition-all duration-150 cursor-pointer",
+        "min-h-[44px] sm:min-h-0",
+        "transition-all duration-150 motion-reduce:transition-none cursor-pointer",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
         active
@@ -36,7 +45,7 @@ export function SourceToggle({
       )}
       style={active ? { backgroundColor: source.color } : undefined}
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-3.5" aria-hidden="true" />
       <span>{source.displayName}</span>
     </button>
   );
