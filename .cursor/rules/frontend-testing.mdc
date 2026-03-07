@@ -1,0 +1,71 @@
+---
+description: Frontend testing strategies, patterns, and best practices
+globs: "**/*.{test,spec}.{ts,tsx,js,jsx}"
+alwaysApply: false
+---
+
+# Frontend Testing
+
+## Testing Pyramid
+
+| Layer | Tool | What to Test | Coverage Target |
+|-------|------|-------------|-----------------|
+| **Unit** | Vitest / Jest | Utils, hooks, pure functions, reducers | High (80%+) |
+| **Component** | Testing Library | Render output, user interactions, state transitions | Medium (60%+) |
+| **Integration** | Testing Library + MSW | Feature flows spanning multiple components | Key flows |
+| **E2E** | Playwright / Cypress | Critical user journeys end-to-end | Happy paths + critical edges |
+
+## Core Principles
+
+- **Test behavior, not implementation**. Assert what the user sees and does — not internal state, private methods, or component structure.
+- **Arrange, Act, Assert (AAA)** pattern for every test. Clear setup, action, and verification.
+- **No snapshot tests** for logic. Only use snapshots for small, stable UI structures (icons, badges). They break too easily and provide little signal.
+- **Deterministic tests**: No reliance on timing, network, or random data. Mock all external dependencies.
+
+## Testing Library Best Practices
+
+```tsx
+// GOOD: Query by role (accessible, user-centric)
+screen.getByRole('button', { name: /submit/i });
+screen.getByLabelText(/email/i);
+
+// BAD: Query by test ID or class (implementation detail)
+screen.getByTestId('submit-btn');
+document.querySelector('.btn-primary');
+```
+
+Priority of queries: `getByRole` > `getByLabelText` > `getByPlaceholderText` > `getByText` > `getByTestId`.
+
+## What to Test
+
+- **Components**: Renders correctly with various props. Responds to user events. Shows correct states (loading, error, empty, success).
+- **Hooks**: Return correct initial state. State updates correctly after actions. Cleanup runs on unmount.
+- **Utils**: Edge cases, boundary values, error inputs, null/undefined handling.
+- **Forms**: Validation messages appear. Submit fires with correct data. Disabled state works.
+- **Routing**: Correct component renders for each route. Redirects work. 404 handling.
+
+## Mocking Rules
+
+- **Mock at boundaries**: API calls (use MSW for request interception), browser APIs, third-party services.
+- **Don't mock what you don't own**: Prefer integration tests over mocking internal modules.
+- **MSW over manual mocks**: Use Mock Service Worker for API mocking — it intercepts at the network level, giving more realistic tests.
+- **Reset mocks between tests**: Every test must run in isolation. Use `beforeEach` / `afterEach` cleanup.
+
+## Async Testing
+
+```tsx
+// GOOD: Wait for UI changes, not arbitrary timeouts
+await waitFor(() => {
+  expect(screen.getByText('Data loaded')).toBeInTheDocument();
+});
+
+// BAD: Arbitrary delays
+await new Promise(r => setTimeout(r, 1000));
+```
+
+## Rules
+
+- Every bug fix must include a regression test.
+- Tests must pass in CI before merge — no skipping, no `.only` in committed code.
+- Prefer `userEvent` over `fireEvent` for realistic interaction simulation.
+- Test error boundaries: verify fallback UI renders on component errors.

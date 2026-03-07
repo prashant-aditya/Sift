@@ -1,0 +1,73 @@
+---
+description: React component patterns, hooks, and composition best practices
+globs: "**/*.{tsx,jsx}"
+alwaysApply: false
+---
+
+# React Component & Hook Patterns
+
+## Component Rules
+
+- **Functional components only**. No class components in new code.
+- **One exported component per file**. Internal helper components are fine.
+- **Named exports** over default exports for better refactoring and IDE support.
+- **Props interface** must be defined explicitly with TypeScript — no `any`.
+- Keep components under ~150 lines. If longer, split into sub-components or extract hooks.
+
+## Component Patterns
+
+### Compound Components
+Use for tightly related component groups sharing implicit state:
+
+```tsx
+<Select value={val} onChange={setVal}>
+  <Select.Trigger />
+  <Select.Options>
+    <Select.Option value="a">Alpha</Select.Option>
+  </Select.Options>
+</Select>
+```
+
+### Render Props / Children as Function
+Use when a parent owns logic but the child controls rendering:
+
+```tsx
+<DataLoader url="/api/items">
+  {({ data, loading }) => loading ? <Spinner /> : <ItemList items={data} />}
+</DataLoader>
+```
+
+### Controlled vs Uncontrolled
+- Prefer **controlled components** (value + onChange) for form elements.
+- Use `useRef` for imperative DOM access (focus, scroll, measurements).
+
+## Hook Rules
+
+- **Never call hooks conditionally** — always at the top level.
+- **Custom hooks** must start with `use` and encapsulate a single concern.
+- Prefer custom hooks over HOCs or render props for logic reuse.
+- Every `useEffect` must have a clear cleanup and explicit dependency array.
+- Never ignore the exhaustive-deps lint rule — fix the dependency, don't suppress it.
+
+### Custom Hook Structure
+
+```tsx
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
+```
+
+## Key Rules
+
+- **Lift state up** only as far as needed — the nearest common ancestor.
+- **Colocate state** with the component that uses it. Don't put everything in global state.
+- Use `key` prop correctly — unique, stable identifiers (never array index for dynamic lists).
+- Avoid inline object/array/function creation in JSX props (causes unnecessary re-renders).
+- Use `React.memo` only when profiling shows a performance need — not by default.
+- Avoid `useEffect` for derived state — compute it during render instead.
+- Event handlers: name them `handleX` in the owning component, `onX` in the prop interface.

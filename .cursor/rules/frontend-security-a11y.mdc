@@ -1,0 +1,52 @@
+---
+description: Frontend security hardening and accessibility (a11y) standards
+alwaysApply: true
+---
+
+# Security & Accessibility
+
+## Security — XSS Prevention
+
+- **Never use `dangerouslySetInnerHTML`** unless the content is sanitized with DOMPurify or equivalent.
+- **Never interpolate user input** into `href`, `src`, or event handler attributes without validation.
+- **Sanitize all user input** on both client and server. Client-side validation is UX; server-side is security.
+- **Content Security Policy (CSP)**: Configure strict CSP headers. No `unsafe-inline` or `unsafe-eval`.
+
+## Security — Auth & Data
+
+- **Never store secrets (tokens, API keys) in frontend code or localStorage**. Use `httpOnly` cookies for auth tokens.
+- **CSRF protection**: Use anti-CSRF tokens for state-changing requests. SameSite cookies help but are not sufficient alone.
+- **Sensitive data**: Never log PII, tokens, or passwords to console. Strip sensitive fields before any client-side logging.
+- **Dependency security**: Run `npm audit` regularly. Pin exact versions in lock files. Review new dependencies before adding.
+
+## Security — URL & Navigation
+
+- **Validate redirect URLs**: Never redirect to user-supplied URLs without allowlisting. Prevent open redirect attacks.
+- **Sanitize query params**: Treat all URL parameters as untrusted input.
+- **Use `rel="noopener noreferrer"`** on external links opened with `target="_blank"`.
+
+## Accessibility (a11y) — Semantic HTML
+
+- Use **semantic elements**: `<nav>`, `<main>`, `<article>`, `<section>`, `<aside>`, `<header>`, `<footer>`.
+- Use `<button>` for actions, `<a>` for navigation. Never use `<div onClick>` for interactive elements.
+- Headings must follow hierarchy: `h1` > `h2` > `h3` — never skip levels for styling.
+
+## Accessibility — ARIA & Interaction
+
+- **ARIA is a last resort**: Prefer semantic HTML. Only add `aria-*` when native semantics are insufficient.
+- Every `<img>` needs `alt` text. Decorative images get `alt=""` and `aria-hidden="true"`.
+- Interactive custom components must support **keyboard navigation**: Enter, Space, Escape, Arrow keys as appropriate.
+- Focus management: modals must trap focus, closing must return focus to the trigger element.
+- All form inputs must have associated `<label>` elements (or `aria-label` / `aria-labelledby`).
+
+## Accessibility — Visual
+
+- Color contrast: minimum **4.5:1** for normal text, **3:1** for large text (WCAG AA).
+- Never convey information by color alone — use icons, patterns, or text alongside.
+- Respect `prefers-reduced-motion` — disable or reduce animations for users who request it.
+- Minimum touch target size: **44x44px** for mobile interfaces.
+
+## Testing
+
+- Run `axe-core` or `jest-axe` in automated tests. Zero critical a11y violations in CI.
+- Test with keyboard-only navigation. Test with screen reader (VoiceOver / NVDA) for critical flows.

@@ -1,0 +1,72 @@
+---
+description: CSS architecture, styling patterns, and responsive design rules
+globs: "**/*.{css,scss,less,module.css,module.scss,styled.ts,styled.tsx,tsx,jsx}"
+alwaysApply: false
+---
+
+# CSS & Styling
+
+## Architecture Approach
+
+- **CSS Modules** or **Tailwind CSS** for component scoping — avoid global CSS for component styles.
+- **Design tokens**: Define spacing, colors, typography, shadows, and breakpoints as variables/tokens. Never hardcode raw values.
+- **Mobile-first**: Write base styles for mobile, then layer on complexity with `min-width` media queries.
+
+## Naming & Organization
+
+- CSS Modules: Class names should describe what the element IS, not what it looks like.
+  - GOOD: `.card`, `.header`, `.navItem`
+  - BAD: `.red-text`, `.mt-20`, `.float-left` (unless using a utility framework)
+- One stylesheet per component. Colocate: `Button.tsx` + `Button.module.css`.
+- Global styles limited to: reset/normalize, CSS custom properties (tokens), and base typography.
+
+## Layout Rules
+
+- **Use CSS Grid** for 2D layouts (page layouts, dashboards, galleries).
+- **Use Flexbox** for 1D layouts (nav bars, card rows, inline elements).
+- **Never use floats** for layout. Never use `!important` except for overriding third-party library styles.
+- **Avoid magic numbers**: Every size, spacing, and position should derive from the design token scale.
+
+## Responsive Design
+
+```css
+/* Design token breakpoints */
+--breakpoint-sm: 640px;
+--breakpoint-md: 768px;
+--breakpoint-lg: 1024px;
+--breakpoint-xl: 1280px;
+
+/* Mobile-first approach */
+.container { padding: var(--space-4); }
+
+@media (min-width: 768px) {
+  .container { padding: var(--space-8); max-width: 720px; }
+}
+```
+
+- Use `rem` / `em` for font sizes and spacing — not `px` (respects user's browser font settings).
+- Use `clamp()` for fluid typography: `font-size: clamp(1rem, 2.5vw, 2rem)`.
+- Test at 320px, 768px, 1024px, 1440px widths minimum.
+
+## Animation & Transitions
+
+- Use `transform` and `opacity` for animations — they're GPU-accelerated and don't trigger layout reflow.
+- Keep transitions under **300ms** for UI feedback. Use `ease-out` for enters, `ease-in` for exits.
+- Respect `prefers-reduced-motion`:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+## Rules
+
+- **No inline styles** except for truly dynamic values (e.g., computed positions, user-set colors).
+- **z-index scale**: Define named z-index layers (dropdown: 100, modal: 200, tooltip: 300, toast: 400). Never use arbitrary z-index values.
+- **Avoid deep nesting**: Max 3 levels of CSS nesting. Deep nesting increases specificity and fragility.
+- **Prefer logical properties**: Use `margin-inline`, `padding-block` over `margin-left`, `padding-top` for RTL support.
+- **Dark mode**: Use CSS custom properties for theming. Toggle via `[data-theme="dark"]` or `prefers-color-scheme`.

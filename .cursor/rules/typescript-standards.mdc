@@ -1,0 +1,75 @@
+---
+description: TypeScript coding standards, type safety, and patterns for frontend projects
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript Standards
+
+## Strict Configuration
+
+- Enable `strict: true` in tsconfig. Never weaken it with `skipLibCheck: true` in app code.
+- Zero `any` tolerance. Use `unknown` when the type is truly unknown, then narrow with type guards.
+- Enable `noUncheckedIndexedAccess` for safer array/object access.
+
+## Type Design
+
+- **Prefer `interface`** for object shapes that may be extended. Use `type` for unions, intersections, and computed types.
+- **Export types** from the module that owns the concept. Consumers import, never redefine.
+- **Discriminated unions** over optional fields for variant types:
+
+```typescript
+// BAD
+interface Shape { kind: string; radius?: number; width?: number; }
+
+// GOOD
+type Shape = { kind: 'circle'; radius: number } | { kind: 'rect'; width: number; height: number };
+```
+
+## Generics & Utility Types
+
+- Use generics to eliminate duplication, not to show cleverness. Every generic param must be constrained:
+
+```typescript
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[key]; }
+```
+
+- Leverage built-in utilities: `Partial<T>`, `Required<T>`, `Pick<T, K>`, `Omit<T, K>`, `Record<K, V>`, `ReturnType<T>`.
+- Create domain-specific utility types when a pattern repeats across the codebase.
+
+## Null Safety
+
+- Prefer `undefined` over `null` for consistency (align with TypeScript defaults).
+- Use optional chaining (`?.`) and nullish coalescing (`??`) — never loose equality checks (`== null`).
+- Narrow types explicitly with type guards before accessing optional properties.
+
+## Error Handling
+
+```typescript
+// GOOD: Typed error handling
+class AppError extends Error {
+  constructor(message: string, public code: string, public statusCode?: number) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+// GOOD: Result pattern for operations that can fail
+type Result<T, E = AppError> = { ok: true; data: T } | { ok: false; error: E };
+```
+
+## Enums & Constants
+
+- **Prefer `as const` objects** over TypeScript enums for bundle size and type inference:
+
+```typescript
+const Status = { ACTIVE: 'active', INACTIVE: 'inactive' } as const;
+type Status = typeof Status[keyof typeof Status];
+```
+
+## Rules
+
+- No type assertions (`as`) unless absolutely necessary — prefer type guards and narrowing.
+- Never use `!` (non-null assertion) in production code — handle the null case.
+- Keep type definitions close to where they're used. Only move to `types/` when shared across 3+ modules.
+- Function return types: explicit for public API / exported functions, inferred for internal helpers.

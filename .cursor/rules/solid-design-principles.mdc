@@ -1,0 +1,89 @@
+---
+description: SOLID principles, OOP patterns, and design patterns applied to frontend development
+alwaysApply: true
+---
+
+# SOLID, OOP & Design Patterns for Frontend
+
+## SOLID Principles
+
+### S — Single Responsibility
+Each component, hook, or module does ONE thing.
+
+```tsx
+// BAD: Component fetches, transforms, and renders
+function UserProfile() {
+  const [user, setUser] = useState(null);
+  useEffect(() => { fetch('/api/user').then(r => r.json()).then(setUser); }, []);
+  const fullName = `${user?.first} ${user?.last}`;
+  return <div>{fullName}</div>;
+}
+
+// GOOD: Separated concerns
+function useUser() { /* fetch logic */ }
+function formatName(user: User) { return `${user.first} ${user.last}`; }
+function UserProfile() {
+  const user = useUser();
+  return <div>{formatName(user)}</div>;
+}
+```
+
+### O — Open/Closed
+Components should be open for extension (via props, children, render props) but closed for modification.
+
+```tsx
+// GOOD: Extensible via composition
+<Card header={<CustomHeader />} footer={<CustomFooter />}>
+  {children}
+</Card>
+```
+
+### L — Liskov Substitution
+Any component implementing an interface should be substitutable. If `<PrimaryButton>` and `<GhostButton>` both extend `ButtonProps`, they must behave consistently for shared props like `onClick`, `disabled`.
+
+### I — Interface Segregation
+Don't force components to depend on props they don't use. Split large prop interfaces into focused ones.
+
+```typescript
+// BAD
+interface Props { name: string; age: number; onSave: () => void; theme: Theme; permissions: string[]; }
+
+// GOOD
+interface UserInfoProps { name: string; age: number; }
+interface ActionProps { onSave: () => void; }
+```
+
+### D — Dependency Inversion
+High-level modules (pages/features) should not depend on low-level modules (API clients) directly. Both should depend on abstractions.
+
+```typescript
+// GOOD: Hook abstracts the data source
+function useProducts(): Product[] { /* could be REST, GraphQL, or mock */ }
+function ProductPage() { const products = useProducts(); }
+```
+
+## OOP Principles in Frontend Context
+
+- **Encapsulation**: Hooks encapsulate state + logic. Components encapsulate UI + behavior. Never expose internal state directly.
+- **Abstraction**: Expose simple interfaces; hide complexity. A `<DatePicker>` hides calendar logic behind `value` + `onChange`.
+- **Polymorphism**: Use discriminated unions and conditional rendering over `instanceof` checks. Prefer composition patterns.
+- **Favor Composition over Inheritance**: Use hooks, HOCs, and render props to share behavior — never `class extends`.
+
+## Key Design Patterns
+
+| Pattern | Frontend Use Case |
+|---------|------------------|
+| **Observer** | Event emitters, pub/sub for cross-module communication, RxJS observables |
+| **Strategy** | Swappable validation, sorting, or formatting functions passed as props/config |
+| **Factory** | Component factories that return configured components based on type |
+| **Adapter** | API response transformers that normalize backend data to frontend models |
+| **Facade** | Service layer wrapping complex subsystems (auth, analytics, storage) |
+| **Decorator** | HOCs that wrap components with additional behavior (withAuth, withTheme) |
+| **Command** | Undo/redo systems, action dispatchers in state management |
+| **Mediator** | State management stores that coordinate between multiple modules |
+
+## Rules
+
+- Prefer pure functions and immutability. Avoid `class` unless integrating with libraries that require it.
+- Every abstraction must justify its existence with at least 2 concrete use cases.
+- Avoid premature abstraction — wait until a pattern repeats before extracting.

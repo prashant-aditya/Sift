@@ -1,0 +1,64 @@
+---
+description: State management patterns, data flow, and caching strategies for frontend
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# State Management & Data Flow
+
+## State Categories
+
+Classify state before choosing where to put it:
+
+| Type | Scope | Solution |
+|------|-------|----------|
+| **UI State** | Component-local (open/closed, hover) | `useState`, `useReducer` |
+| **Form State** | Form-scoped (inputs, validation) | React Hook Form, Formik, or controlled `useState` |
+| **Server State** | Cache of remote data | React Query, SWR, RTK Query |
+| **URL State** | Shareable, bookmarkable | Query params, route params |
+| **Global App State** | Cross-cutting (auth, theme, locale) | Zustand, Redux Toolkit, Context |
+
+## Golden Rules
+
+1. **Start local, elevate only when needed**. Default to `useState`. Only move state up or to a store when multiple unrelated components need it.
+2. **Server state is NOT app state**. Use a data-fetching library (React Query/SWR) — don't manually sync API responses into Redux/Zustand.
+3. **URL is the source of truth** for navigation-related state (filters, pagination, search, selected tab). Sync UI from URL, not the reverse.
+4. **Derived state should be computed, not stored**. If a value can be calculated from existing state, compute it inline — don't `useState` + `useEffect` to sync it.
+
+## Patterns
+
+### useReducer for Complex State
+When state has multiple sub-values or complex transitions:
+
+```typescript
+type Action = { type: 'SET_LOADING' } | { type: 'SET_DATA'; payload: Item[] } | { type: 'SET_ERROR'; payload: string };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'SET_LOADING': return { ...state, loading: true, error: null };
+    case 'SET_DATA': return { ...state, loading: false, data: action.payload };
+    case 'SET_ERROR': return { ...state, loading: false, error: action.payload };
+  }
+}
+```
+
+### Context — Dos and Don'ts
+
+- DO: Use for low-frequency updates (theme, auth, locale, feature flags).
+- DON'T: Use for high-frequency updates (form inputs, animations, frequently-changing lists).
+- Split contexts by concern. Never create a single "AppContext" god object.
+- Wrap context value in `useMemo` to prevent unnecessary re-renders of consumers.
+
+### Immutability
+
+- **Never mutate state directly**. Always return new objects/arrays.
+- Use spread operator or `structuredClone` for shallow/deep copies.
+- For complex nested updates, use Immer (built into Redux Toolkit).
+
+## Data Fetching Rules
+
+- Every data fetch must handle: **loading**, **error**, **empty**, and **success** states.
+- Implement **retry logic** with exponential backoff for transient failures.
+- **Cache invalidation**: Invalidate related queries after mutations. Don't rely on time-based expiry alone.
+- **Optimistic updates**: For fast UX on writes, update the cache immediately and rollback on server error.
+- **Pagination**: Use cursor-based pagination for real-time data, offset-based for static lists.

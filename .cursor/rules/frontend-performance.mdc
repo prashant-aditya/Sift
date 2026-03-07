@@ -1,0 +1,53 @@
+---
+description: Frontend performance optimization patterns and best practices
+globs: "**/*.{ts,tsx,jsx,js}"
+alwaysApply: false
+---
+
+# Frontend Performance
+
+## Rendering Optimization
+
+- **Avoid unnecessary re-renders**: Use React DevTools Profiler to identify wasted renders before optimizing.
+- **`useMemo`**: For expensive computations that depend on specific inputs. Not for trivial operations.
+- **`useCallback`**: Only when passing callbacks to memoized children or as effect dependencies.
+- **`React.memo`**: Wrap components that re-render often with the same props. Always profile first.
+- **Virtualization**: Use `react-window` or `react-virtuoso` for lists > 100 items. Never render thousands of DOM nodes.
+
+## Code Splitting & Loading
+
+- **Route-based splitting**: Every route should be a lazy-loaded chunk via `React.lazy` + `Suspense`.
+- **Component-level splitting**: Heavy components (charts, editors, modals) should be lazy-loaded.
+- **Prefetch critical chunks**: Use `<link rel="prefetch">` or router-level prefetching for likely next navigations.
+- **Bundle analysis**: Run `webpack-bundle-analyzer` or equivalent regularly. Flag any chunk > 250KB.
+
+## Network Performance
+
+- **Stale-While-Revalidate**: Use libraries like `react-query` / `swr` for data fetching with smart caching.
+- **Debounce / Throttle**: Debounce search inputs (300ms). Throttle scroll/resize handlers (16ms for 60fps).
+- **Request deduplication**: Never fire duplicate API calls for the same data in the same render cycle.
+- **Pagination / Infinite Scroll**: Never load unbounded datasets. Default page sizes: 20-50 items.
+- **Optimistic Updates**: For mutations with high success rate, update UI immediately and rollback on failure.
+
+## Asset Optimization
+
+- **Images**: Use `<img loading="lazy">`, serve responsive sizes with `srcset`, prefer WebP/AVIF formats.
+- **Fonts**: Use `font-display: swap`, preload critical fonts, limit to 2 font families max.
+- **Icons**: Use SVG sprite or icon component library — not individual image files.
+
+## Memory & Runtime
+
+- **Clean up effects**: Every `useEffect` subscription, timer, or listener must return a cleanup function.
+- **Avoid memory leaks**: Cancel pending requests on unmount. Use `AbortController` for fetch calls.
+- **Web Workers**: Offload CPU-intensive work (parsing, encryption, data processing) to Web Workers.
+- **Avoid layout thrashing**: Batch DOM reads and writes. Use `requestAnimationFrame` for visual updates.
+
+## Performance Budgets
+
+| Metric | Target |
+|--------|--------|
+| LCP (Largest Contentful Paint) | < 2.5s |
+| FID (First Input Delay) | < 100ms |
+| CLS (Cumulative Layout Shift) | < 0.1 |
+| Bundle size (initial JS) | < 200KB gzipped |
+| Time to Interactive | < 3.5s |

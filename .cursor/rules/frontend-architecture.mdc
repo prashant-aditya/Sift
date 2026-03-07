@@ -1,0 +1,58 @@
+---
+description: Frontend system design and architecture principles for scalable, maintainable applications
+alwaysApply: true
+---
+
+# Frontend Architecture & System Design
+
+## Core Architecture Principles
+
+- **Separation of Concerns**: Split UI, business logic, data fetching, and state into distinct layers. Never mix API calls directly inside render logic.
+- **Single Responsibility**: Each module/file should own exactly one concern — a component renders, a hook manages logic, a service handles API calls.
+- **DRY (Don't Repeat Yourself)**: Extract shared logic into utils, hooks, or components. If you copy-paste code 3+ times, abstract it.
+- **KISS**: Prefer simple, readable solutions over clever ones. Avoid premature abstractions.
+- **YAGNI**: Don't build features or abstractions until they're actually needed. Speculative generality leads to bloat.
+
+## Layered Architecture
+
+Organize code into clear layers:
+
+```
+src/
+  components/      # Pure UI components (presentational)
+  containers/      # Smart components that wire logic to UI
+  hooks/           # Custom hooks (reusable logic)
+  services/        # API clients, external integrations
+  stores/          # State management (global state)
+  utils/           # Pure utility functions
+  types/           # Shared TypeScript types/interfaces
+  constants/       # App-wide constants and config
+```
+
+## Design Decisions
+
+- **Composition over Inheritance**: Build complex UI by composing small components, not extending base classes.
+- **Dependency Injection**: Pass dependencies (services, configs) via props, context, or hooks — not hard-coded imports in components.
+- **Interface-Driven Design**: Define clear contracts (TypeScript interfaces) between layers before implementing.
+- **Unidirectional Data Flow**: Data flows top-down via props; events flow bottom-up via callbacks. Never mutate parent state directly.
+- **Feature-Based Colocation**: For larger apps, colocate related components, hooks, tests, and styles by feature rather than by type.
+
+## Scalability Patterns
+
+- **Code Splitting**: Lazy-load routes and heavy components with `React.lazy()` + `Suspense`.
+- **Module Federation / Micro-Frontends**: For multi-team apps, consider independently deployable frontend modules.
+- **API Layer Abstraction**: Wrap all network calls in a service layer with consistent error handling, retries, and caching.
+- **Configuration-Driven UI**: Use config objects for forms, tables, navigation — avoid hardcoding repetitive UI structures.
+
+## Error Handling Strategy
+
+- Use **Error Boundaries** at route and feature level — never let a single component crash the entire app.
+- Every async operation must handle loading, success, and error states explicitly.
+- Centralize error formatting and user-facing messages; components should not format raw API errors.
+
+## Communication Patterns
+
+- **Props**: Parent-to-child data. Keep prop interfaces lean.
+- **Context**: Cross-cutting concerns (theme, auth, locale). Do NOT use for frequently-changing state.
+- **Event Bus / Pub-Sub**: Only for truly decoupled module-to-module communication. Prefer explicit data flow.
+- **URL as State**: Encode shareable state (filters, pagination, search) in the URL. Use query params.
