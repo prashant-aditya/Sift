@@ -1573,15 +1573,15 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `main.py`, `config.py`, `requirements.txt`, `Dockerfile`, `docker-compose.yml` | **Duration:** Day 1
 
-- [ ] **CP-1.1.1** Initialize Python 3.11+ project with `requirements.txt` and install core dependencies:
+- [x] **CP-1.1.1** Initialize Python 3.11+ project with `requirements.txt` and install core dependencies:
   `fastapi`, `uvicorn[standard]`, `pydantic`, `pydantic-settings`, `httpx`, `python-dotenv`, `sse-starlette`, `chromadb`, `groq`
-- [ ] **CP-1.1.2** Create `main.py` with FastAPI app instance, CORS middleware (allow `localhost:3000`), and a `lifespan` handler for startup/shutdown hooks
-- [ ] **CP-1.1.3** Create `config.py` using `pydantic-settings.BaseSettings` loading from `.env`:
+- [x] **CP-1.1.2** Create `main.py` with FastAPI app instance, CORS middleware (allow `localhost:3000`), and a `lifespan` handler for startup/shutdown hooks
+- [x] **CP-1.1.3** Create `config.py` using `pydantic-settings.BaseSettings` loading from `.env`:
   - Fields: `groq_api_key`, `chroma_persist_dir`, `embedding_model`, `llm_model`, `max_sources_per_query`, `chunk_size`, `chunk_overlap`
-- [ ] **CP-1.1.4** Create `health.py` route: `GET /api/v1/health` returning `{"status": "ok", "version": "0.1.0"}`
-- [ ] **CP-1.1.5** Create `Dockerfile` (Python 3.11-slim, multi-stage build)
-- [ ] **CP-1.1.6** Create `docker-compose.yml` with `backend` service + volume for ChromaDB persistence
-- [ ] **CP-1.1.7** Create `.env.example` with all required environment variables documented
+- [x] **CP-1.1.4** Create `health.py` route: `GET /api/v1/health` returning `{"status": "ok", "version": "0.1.0"}`
+- [x] **CP-1.1.5** Create `Dockerfile` (Python 3.11-slim, multi-stage build)
+- [x] **CP-1.1.6** Create `docker-compose.yml` with `backend` service + volume for ChromaDB persistence
+- [x] **CP-1.1.7** Create `.env.example` with all required environment variables documented
 
 **Checkpoint Review:**
 - `docker compose up` starts the backend on port 8000
@@ -1594,21 +1594,21 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `sources/base.py`, `sources/duckduckgo.py`, `sources/wikipedia.py`, `sources/hackernews.py`, `sources/registry.py` | **Duration:** Days 2-3
 
-- [ ] **CP-1.2.1** Define abstract base class `SourceAdapter` in `base.py` with `name`, `display_name`, `max_results`, `timeout_seconds`, abstract `search()`, and abstract `is_available()`
-- [ ] **CP-1.2.2** Define `SourceResult` Pydantic model: `title`, `url`, `snippet`, `raw_content`, `source_name`, `published_date`, `metadata`
-- [ ] **CP-1.2.3** Implement `DuckDuckGoAdapter`:
+- [x] **CP-1.2.1** Define abstract base class `SourceAdapter` in `base.py` with `name`, `display_name`, `max_results`, `timeout_seconds`, abstract `search()`, and abstract `is_available()`
+- [x] **CP-1.2.2** Define `SourceResult` Pydantic model: `title`, `url`, `snippet`, `raw_content`, `source_name`, `published_date`, `metadata`
+- [x] **CP-1.2.3** Implement `DuckDuckGoAdapter`:
   - Use `duckduckgo-search` library
   - Parse results into `list[SourceResult]`
   - Handle rate limiting with 1s delay, 10s hard timeout
-- [ ] **CP-1.2.4** Implement `WikipediaAdapter`:
+- [x] **CP-1.2.4** Implement `WikipediaAdapter`:
   - Wikipedia search API → top 3 article summaries via REST API
   - Extract `extract` field as raw_content
-- [ ] **CP-1.2.5** Implement `HackerNewsAdapter`:
+- [x] **CP-1.2.5** Implement `HackerNewsAdapter`:
   - Algolia HN API for top 10 stories by relevance
   - Fetch comments for top 5 stories, sort by points
-- [ ] **CP-1.2.6** Implement `SourceRegistry` in `registry.py` with `register()`, `get()`, `get_all()`, `get_available()` methods
-- [ ] **CP-1.2.7** Auto-register all adapters on app startup via FastAPI `lifespan`
-- [ ] **CP-1.2.8** Write tests per adapter with mocked HTTP (via `respx`/`pytest-httpx`):
+- [x] **CP-1.2.6** Implement `SourceRegistry` in `registry.py` with `register()`, `get()`, `get_all()`, `get_available()` methods
+- [x] **CP-1.2.7** Auto-register all adapters on app startup via FastAPI `lifespan`
+- [x] **CP-1.2.8** Write tests per adapter with mocked HTTP (via `respx`/`pytest-httpx`):
   valid response, empty results, timeout, malformed response
 
 **Checkpoint Review:**
@@ -1622,24 +1622,24 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `ingestion/pipeline.py`, `ingestion/extractors.py`, `ingestion/chunker.py`, `ingestion/embedder.py` | **Duration:** Days 3-4
 
-- [ ] **CP-1.3.1** Implement `ContentExtractor` in `extractors.py`:
+- [x] **CP-1.3.1** Implement `ContentExtractor` in `extractors.py`:
   - `extract_from_html()` via `beautifulsoup4` + `readability-lxml`
   - `extract_from_text()` — clean whitespace, normalize unicode
   - `extract_from_snippet()` — use snippet as-is when full content unavailable
   - Handle encoding issues (UTF-8 normalize, strip null bytes)
-- [ ] **CP-1.3.2** Implement `TextChunker` in `chunker.py`:
+- [x] **CP-1.3.2** Implement `TextChunker` in `chunker.py`:
   - Recursive character text splitter (512 tokens, 64 overlap)
   - Split hierarchy: `\n\n` → `\n` → `. ` → ` ` → character
   - Token counting via `tiktoken` (cl100k_base)
   - Preserve metadata per chunk: `chunk_id`, `source_url`, `source_name`, `source_title`, `chunk_index`, `total_chunks`, `published_date`, `fetched_at`
-- [ ] **CP-1.3.3** Implement `EmbeddingGenerator` in `embedder.py`:
+- [x] **CP-1.3.3** Implement `EmbeddingGenerator` in `embedder.py`:
   - Primary: HuggingFace Inference API (`all-MiniLM-L6-v2`, 384 dimensions)
   - Batch embedding: up to 32 chunks per API call
   - Fallback: local `sentence-transformers`
   - Retry: 2 retries with 1s backoff on 429/503
-- [ ] **CP-1.3.4** Implement `IngestionPipeline` in `pipeline.py`:
+- [x] **CP-1.3.4** Implement `IngestionPipeline` in `pipeline.py`:
   `process(list[SourceResult]) → list[Chunk]` — extract → chunk → embed → return
-- [ ] **CP-1.3.5** Write tests: chunker sizes/overlaps, metadata preservation, HTML extraction, embedder batching, full pipeline e2e with mock data
+- [x] **CP-1.3.5** Write tests: chunker sizes/overlaps, metadata preservation, HTML extraction, embedder batching, full pipeline e2e with mock data
 
 **Checkpoint Review:**
 - Pipeline converts `list[SourceResult]` → `list[Chunk]` with embeddings
@@ -1652,12 +1652,12 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `db/vector_store.py` | **Duration:** Day 4
 
-- [ ] **CP-1.4.1** Implement `VectorStore` class wrapping `chromadb.PersistentClient`:
+- [x] **CP-1.4.1** Implement `VectorStore` class wrapping `chromadb.PersistentClient`:
   - `get_or_create_collection()`, `upsert_chunks()`, `query()`, `delete_collection()`, `get_collection_stats()`
-- [ ] **CP-1.4.2** Define `RetrievedChunk` Pydantic model: `chunk`, `score`, `citation_id`
-- [ ] **CP-1.4.3** Collection naming convention: `session_{session_id}` for session-scoped, `global` for persistent
-- [ ] **CP-1.4.4** Persist directory configurable via `CHROMA_PERSIST_DIR` env var
-- [ ] **CP-1.4.5** Write tests: upsert + query, metadata filtering, empty collection, persistence across restarts
+- [x] **CP-1.4.2** Define `RetrievedChunk` Pydantic model: `chunk`, `score`, `citation_id`
+- [x] **CP-1.4.3** Collection naming convention: `session_{session_id}` for session-scoped, `global` for persistent
+- [x] **CP-1.4.4** Persist directory configurable via `CHROMA_PERSIST_DIR` env var
+- [x] **CP-1.4.5** Write tests: upsert + query, metadata filtering, empty collection, persistence across restarts
 
 **Checkpoint Review:**
 - Chunks can be stored and retrieved by semantic similarity
@@ -1670,18 +1670,18 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `core/query_analyzer.py`, `core/synthesizer.py` | **Duration:** Days 4-5
 
-- [ ] **CP-1.5.1** Implement `QueryAnalyzer`:
+- [x] **CP-1.5.1** Implement `QueryAnalyzer`:
   - Groq API integration with `llama-3.1-70b-versatile`
   - System prompt for decomposing complex queries into 2-4 focused sub-queries
   - Temperature: 0.1 (deterministic decomposition)
   - Parse JSON array response with fallback (split on newlines if JSON fails)
   - Simple queries returned as single-element array
-- [ ] **CP-1.5.2** Implement `Synthesizer`:
+- [x] **CP-1.5.2** Implement `Synthesizer`:
   - Takes `list[RetrievedChunk]` + original `query` → streams cited answer
   - System prompt enforces `[1]`, `[2]`, `[3]` citation format referencing only provided source IDs
   - Streaming: `stream=True`, yield token-by-token from Groq
   - Temperature: 0.3, max tokens: 2048
-- [ ] **CP-1.5.3** Write tests:
+- [x] **CP-1.5.3** Write tests:
   - Decomposition produces valid JSON arrays
   - Simple query passthrough
   - Synthesis includes citation markers

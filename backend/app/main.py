@@ -7,17 +7,31 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.health import router as health_router
 from app.config import get_settings
+from app.sources.duckduckgo import DuckDuckGoAdapter
+from app.sources.hackernews import HackerNewsAdapter
+from app.sources.registry import SourceRegistry
+from app.sources.wikipedia import WikipediaAdapter
 
 logger = logging.getLogger(__name__)
+
+source_registry = SourceRegistry()
+
+
+def _register_sources() -> None:
+    source_registry.register(DuckDuckGoAdapter())
+    source_registry.register(WikipediaAdapter())
+    source_registry.register(HackerNewsAdapter())
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    _register_sources()
     logger.info(
-        "Starting Sift backend — chroma_dir=%s, llm=%s",
+        "Starting Sift backend — chroma_dir=%s, llm=%s, sources=%s",
         settings.chroma_persist_dir,
         settings.llm_model,
+        [s.name for s in source_registry.get_available()],
     )
     yield
     logger.info("Shutting down Sift backend")

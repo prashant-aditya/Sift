@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables / .env file."""
 
     groq_api_key: str = ""
+    hf_api_token: str = ""
 
     llm_model: str = "llama-3.1-70b-versatile"
     embedding_model: str = "all-MiniLM-L6-v2"
