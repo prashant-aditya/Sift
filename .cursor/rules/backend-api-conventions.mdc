@@ -1,0 +1,136 @@
+---
+description: Flask API design conventions, REST patterns, testing, and code quality standards
+alwaysApply: true
+---
+
+# Flask API Conventions & Code Quality
+
+## REST API Design
+
+- Use **nouns** for resource endpoints, **HTTP methods** for actions:
+  - `GET /api/v1/users` — list
+  - `POST /api/v1/users` — create
+  - `GET /api/v1/users/<id>` — retrieve
+  - `PUT /api/v1/users/<id>` — full update
+  - `PATCH /api/v1/users/<id>` — partial update
+  - `DELETE /api/v1/users/<id>` — delete
+- Always version your API (`/api/v1/`, `/api/v2/`).
+- Use plural nouns for collections (`/users`, not `/user`).
+- Return appropriate HTTP status codes: `200`, `201`, `204`, `400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`.
+- Use `Location` header on `201 Created` responses.
+
+## Flask Blueprints
+
+Organize routes into Blueprints by domain. Each blueprint is a self-contained module.
+
+```python
+# app/routes/users.py
+from flask import Blueprint
+
+users_bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
+
+@users_bp.route("/", methods=["GET"])
+def list_users():
+    ...
+```
+
+Register all blueprints in the factory:
+
+```python
+def register_blueprints(app):
+    from app.routes.users import users_bp
+    from app.routes.auth import auth_bp
+    app.register_blueprint(users_bp)
+    app.register_blueprint(auth_bp)
+```
+
+## Request / Response Conventions
+
+- Always return **JSON** responses from API endpoints.
+- Use **Marshmallow schemas** or **Pydantic** for both input validation and output serialization.
+- Envelope responses consistently — either always envelope (`{"data": ...}`) or never. Pick one and stick to it.
+- Support **pagination** on all list endpoints using `page` + `per_page` or cursor-based pagination:
+
+```python
+{"data": [...], "meta": {"page": 1, "per_page": 20, "total": 142}}
+```
+
+- Support **filtering** via query params: `GET /users?role=admin&active=true`.
+- Support **sorting**: `GET /users?sort=-created_at` (prefix `-` for descending).
+
+## Database Transactions
+
+- Use **one transaction per request** as the default (Flask-SQLAlchemy handles this).
+- For complex operations requiring multiple steps, use explicit transaction management:
+
+```python
+try:
+    db.session.add(order)
+    db.session.add(payment)
+    db.session.commit()
+except Exception:
+    db.session.rollback()
+    raise
+```
+
+- Never leave sessions in a dirty state. Always commit or rollback.
+
+## Testing Standards
+
+- **Test pyramid**: Many unit tests, fewer integration tests, minimal E2E tests.
+- Use **pytest** as the test runner. Use **fixtures** for setup/teardown.
+- Use a **separate test database** — never run tests against production or development data.
+- Test at the right layer:
+  - **Unit**: Services, utils, validators — mock external dependencies.
+  - **Integration**: Routes with a test client — real DB, mocked external APIs.
+  - **Contract**: Validate API response shapes against schemas.
+
+```python
+@pytest.fixture
+def client(app):
+    return app.test_client()
+
+def test_create_user(client):
+    response = client.post("/api/v1/users", json={"email": "test@example.com", "name": "Test"})
+    assert response.status_code == 201
+    assert response.json["data"]["email"] == "test@example.com"
+```
+
+- Aim for **>80% coverage** on business logic (services layer). Don't chase 100% — focus on critical paths.
+- Every bug fix must include a regression test.
+
+## Code Quality Standards
+
+- **Type hints everywhere**: All function signatures, class attributes, and return types.
+- Run **mypy** (or pyright) in strict mode in CI.
+- Use **ruff** or **flake8 + black + isort** for linting and formatting. Zero tolerance for lint errors in CI.
+- Maximum function length: **~30 lines**. If longer, extract helper functions.
+- Maximum file length: **~300 lines**. If longer, split into modules.
+- Maximum function arguments: **5**. If more, use a dataclass or typed dict.
+- Docstrings on all public functions and classes using Google or NumPy style.
+
+## Async & Background Tasks
+
+- Use **Celery** for background work (emails, reports, heavy computation).
+- Tasks must be **idempotent** — safe to retry without side effects.
+- Set **timeouts** on all tasks. Use `soft_time_limit` for graceful shutdown.
+- Monitor task queues with Flower or equivalent tooling.
+
+```python
+@celery.task(bind=True, max_retries=3, soft_time_limit=300)
+def process_research(self, session_id: str):
+    try:
+        ...
+    except SoftTimeLimitExceeded:
+        logger.warning("Task timed out", extra={"session_id": session_id})
+    except Exception as exc:
+        self.retry(exc=exc, countdown=2 ** self.request.retries)
+```
+
+## Environment & Deployment
+
+- Use **Gunicorn** or **uWSGI** in production. Never run Flask's dev server in prod.
+- Configure worker count: `(2 × CPU cores) + 1` as a starting point.
+- Use **Docker** for consistent environments across dev, staging, and production.
+- Health checks must verify all critical dependencies (DB, cache, task queue).
+- Use **structured logging** (JSON) in production for log aggregation.

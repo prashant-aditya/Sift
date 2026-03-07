@@ -1,0 +1,109 @@
+---
+description: Backend architecture, system design, and scalability principles for Python Flask applications
+alwaysApply: true
+---
+
+# Backend Architecture & System Design
+
+## Core Architecture Principles
+
+- **Separation of Concerns**: Split routing, business logic, data access, and serialization into distinct layers. Routes should never contain raw SQL or business rules.
+- **Single Responsibility**: Each module owns one concern — a route handles HTTP, a service handles logic, a repository handles persistence.
+- **DRY**: Extract shared logic into utils, decorators, or base classes. If you copy-paste code 3+ times, abstract it.
+- **KISS**: Prefer simple, readable solutions. Avoid premature abstraction or over-engineering.
+- **YAGNI**: Don't build features or abstractions until they're needed. Speculative generality is debt.
+
+## Layered Architecture
+
+Organize code into clear layers with strict dependency direction (top → bottom):
+
+```
+app/
+  routes/          # HTTP layer — request parsing, response formatting
+  services/        # Business logic — orchestration, rules, workflows
+  repositories/    # Data access — queries, ORM operations
+  models/          # SQLAlchemy / domain models
+  schemas/         # Marshmallow / Pydantic serialization schemas
+  utils/           # Pure utility functions (no side effects)
+  extensions.py    # Flask extension instances (db, migrate, mail, cache)
+  config.py        # Environment-based configuration classes
+  factory.py       # Application factory (create_app)
+```
+
+**Rules:**
+- Routes depend on Services, never on Repositories directly.
+- Services depend on Repositories, never on Flask request/response objects.
+- Repositories depend on Models only. No HTTP concepts leak here.
+- Models are plain data definitions with no business logic beyond validation.
+
+## Application Factory Pattern
+
+Always use Flask's application factory. Never create the app at module level.
+
+```python
+# BAD — module-level app
+app = Flask(__name__)
+db.init_app(app)
+
+# GOOD — factory function
+def create_app(config_name="default"):
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+    register_extensions(app)
+    register_blueprints(app)
+    register_error_handlers(app)
+    return app
+```
+
+## Configuration Management
+
+- Use class-based config with inheritance: `BaseConfig → DevelopmentConfig → ProductionConfig → TestingConfig`.
+- Load secrets from environment variables, **never** hardcode them.
+- Validate required config at startup — fail fast if critical vars are missing.
+
+```python
+class BaseConfig:
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY = os.environ.get("SECRET_KEY") or raise_missing("SECRET_KEY")
+
+class ProductionConfig(BaseConfig):
+    SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"]
+    DEBUG = False
+```
+
+## Scalability Patterns
+
+| Pattern | Use Case |
+|---|---|
+| **Blueprints** | Modularize routes by domain (auth, users, research) |
+| **Task Queues (Celery)** | Offload long-running work (emails, ML inference, scraping) |
+| **Caching (Redis/Memcached)** | Cache expensive queries, rate limit data, session storage |
+| **Connection Pooling** | Use SQLAlchemy pool with appropriate `pool_size` and `max_overflow` |
+| **Horizontal Scaling** | Stateless app servers behind a load balancer; shared state in Redis/DB |
+| **Database Read Replicas** | Route read-heavy queries to replicas, writes to primary |
+
+## Database Design
+
+- Use **Alembic** (via Flask-Migrate) for all schema changes. Never modify schemas manually in production.
+- Add indexes on columns used in WHERE, JOIN, and ORDER BY clauses.
+- Use foreign keys and constraints at the database level — don't rely solely on application-level validation.
+- Prefer UUIDs over auto-increment integers for public-facing IDs.
+- Always include `created_at` and `updated_at` timestamps on every table.
+
+## Error Handling Strategy
+
+- Register **global error handlers** for HTTP errors (400, 401, 403, 404, 422, 500) in the factory.
+- Every service method must handle its own exceptions and translate them to domain-specific errors.
+- Never expose raw tracebacks or internal error details in API responses.
+- Use structured error responses consistently:
+
+```python
+{"error": {"code": "RESOURCE_NOT_FOUND", "message": "User not found", "details": {}}}
+```
+
+## Communication Patterns
+
+- **Synchronous**: Direct function calls between layers (Route → Service → Repository).
+- **Asynchronous**: Celery tasks for background work. Use result backends sparingly.
+- **Events / Signals**: Use Flask signals or blinker for cross-cutting concerns (audit logs, notifications). Keep handlers lightweight.
+- **Pub/Sub**: Redis pub/sub or message brokers for inter-service communication in microservice setups.

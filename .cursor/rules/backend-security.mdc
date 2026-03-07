@@ -1,0 +1,112 @@
+---
+description: Security, authentication, input validation, and error handling for Python Flask backends
+alwaysApply: true
+---
+
+# Backend Security & Error Handling
+
+## Input Validation
+
+- **Validate all input at the boundary** — route handlers must validate and sanitize every field before passing to services.
+- Use **Marshmallow** or **Pydantic** schemas for request validation. Never access `request.get_json()` fields directly in business logic.
+- **Whitelist** allowed fields. Reject unexpected keys to prevent mass-assignment vulnerabilities.
+- Validate data types, ranges, lengths, and formats. Reject early with clear error messages.
+
+```python
+# BAD: No validation
+user = User(email=request.json["email"], role=request.json["role"])
+
+# GOOD: Schema-based validation with field restrictions
+class UserCreateSchema(Schema):
+    email = fields.Email(required=True)
+    name = fields.Str(required=True, validate=validate.Length(min=1, max=255))
+    # 'role' intentionally excluded — never trust client to set role
+```
+
+## Authentication & Authorization
+
+- Use **JWT** (via Flask-JWT-Extended) or **session-based** auth with `httpOnly`, `Secure`, `SameSite` cookies.
+- **Never store secrets, tokens, or API keys** in source code, client-side storage, or logs.
+- Implement **role-based access control (RBAC)** or **attribute-based access control (ABAC)** as decorators.
+- Always verify token expiration and signature. Rotate secrets periodically.
+- Apply the **principle of least privilege** — default deny, explicitly grant access.
+
+```python
+@bp.route("/admin/users")
+@require_role("admin")
+def list_users():
+    ...
+```
+
+## SQL Injection & ORM Safety
+
+- **Always use parameterized queries** or ORM methods. Never concatenate user input into SQL strings.
+- When using raw SQL, use SQLAlchemy `text()` with bound parameters.
+
+```python
+# BAD — SQL injection risk
+db.engine.execute(f"SELECT * FROM users WHERE email = '{email}'")
+
+# GOOD — parameterized
+db.session.execute(text("SELECT * FROM users WHERE email = :email"), {"email": email})
+```
+
+## API Security
+
+- **Rate limiting**: Apply per-IP and per-user rate limits using Flask-Limiter. Protect auth endpoints aggressively.
+- **CORS**: Whitelist specific origins. Never use `*` in production.
+- **CSRF**: Use anti-CSRF tokens for cookie-based auth. Not needed for pure Bearer-token APIs.
+- **Content-Type enforcement**: Reject requests with unexpected Content-Type headers.
+- Set security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`.
+
+## Secrets & Configuration
+
+- Load secrets from environment variables or a secrets manager (Vault, AWS SSM).
+- Never commit `.env`, credentials, or key files. Add them to `.gitignore`.
+- Use different secrets per environment (dev/staging/prod).
+- Audit dependencies regularly with `pip-audit` or `safety check`.
+
+## Error Handling
+
+- **Never expose stack traces** or internal error details in production responses.
+- Return consistent, structured error responses with machine-readable codes:
+
+```python
+@app.errorhandler(ValidationError)
+def handle_validation_error(err):
+    return jsonify(error={"code": "VALIDATION_ERROR", "message": str(err), "details": err.messages}), 422
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(err):
+    app.logger.exception("Unhandled exception")
+    return jsonify(error={"code": "INTERNAL_ERROR", "message": "An unexpected error occurred"}), 500
+```
+
+- Use **custom exception classes** for domain errors:
+
+```python
+class DomainError(Exception):
+    def __init__(self, code: str, message: str, status: int = 400):
+        self.code = code
+        self.message = message
+        self.status = status
+
+class ResourceNotFoundError(DomainError):
+    def __init__(self, resource: str, identifier: str):
+        super().__init__("RESOURCE_NOT_FOUND", f"{resource} '{identifier}' not found", 404)
+```
+
+## Logging & Monitoring
+
+- Use Python's `logging` module with structured JSON output in production.
+- **Never log PII, passwords, tokens, or full request bodies** containing sensitive data.
+- Log at appropriate levels: `DEBUG` for dev tracing, `INFO` for business events, `WARNING` for recoverable issues, `ERROR` for failures, `CRITICAL` for system-level emergencies.
+- Include correlation IDs (request ID) in every log entry for traceability.
+- Set up health check endpoints (`/health`, `/ready`) that verify DB and cache connectivity.
+
+## Dependency Security
+
+- Pin exact dependency versions in `requirements.txt` or use `poetry.lock`.
+- Run `pip-audit` in CI. Block merges with known vulnerabilities.
+- Minimize dependencies — every package is attack surface. Evaluate before adding.
+- Keep Python and system packages updated with security patches.

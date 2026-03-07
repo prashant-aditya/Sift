@@ -1,0 +1,126 @@
+---
+description: SOLID, OOP, and design patterns for Python Flask backend development
+alwaysApply: true
+---
+
+# SOLID, OOP & Design Patterns for Python Backend
+
+## SOLID Principles
+
+### S — Single Responsibility
+
+Each class, function, or module does ONE thing.
+
+```python
+# BAD: Route handles HTTP, business logic, and DB access
+@app.route("/users", methods=["POST"])
+def create_user():
+    data = request.get_json()
+    if not data.get("email"):
+        return jsonify(error="Email required"), 400
+    user = User(email=data["email"])
+    db.session.add(user)
+    db.session.commit()
+    send_welcome_email(user.email)
+    return jsonify(user.to_dict()), 201
+
+# GOOD: Separated concerns
+@bp.route("/users", methods=["POST"])
+def create_user():
+    data = UserCreateSchema().load(request.get_json())
+    user = user_service.create(data)
+    return jsonify(UserResponseSchema().dump(user)), 201
+```
+
+### O — Open/Closed
+
+Classes should be open for extension, closed for modification. Use abstract base classes and dependency injection.
+
+```python
+# GOOD: New sources added without modifying existing code
+class BaseSource(ABC):
+    @abstractmethod
+    def search(self, query: str) -> list[Result]: ...
+
+class RedditSource(BaseSource):
+    def search(self, query: str) -> list[Result]: ...
+
+class ArxivSource(BaseSource):
+    def search(self, query: str) -> list[Result]: ...
+```
+
+### L — Liskov Substitution
+
+Any subclass must be substitutable for its parent without breaking behavior. If `PostgresRepository` and `SQLiteRepository` both implement `BaseRepository`, they must honor the same contract for all methods.
+
+### I — Interface Segregation
+
+Don't force classes to implement methods they don't use. Split fat interfaces into focused ones.
+
+```python
+# BAD: One massive interface
+class DataStore(ABC):
+    @abstractmethod
+    def read(self): ...
+    @abstractmethod
+    def write(self): ...
+    @abstractmethod
+    def stream(self): ...
+
+# GOOD: Focused interfaces
+class Readable(ABC):
+    @abstractmethod
+    def read(self): ...
+
+class Writable(ABC):
+    @abstractmethod
+    def write(self): ...
+```
+
+### D — Dependency Inversion
+
+High-level modules should depend on abstractions, not concrete implementations.
+
+```python
+# BAD: Service tightly coupled to a specific repository
+class UserService:
+    def __init__(self):
+        self.repo = PostgresUserRepository()
+
+# GOOD: Depend on abstraction, inject implementation
+class UserService:
+    def __init__(self, repo: UserRepository):
+        self.repo = repo
+```
+
+## OOP Principles
+
+- **Encapsulation**: Use private attributes (`_name`) and properties. Expose behavior, not internal state. Services encapsulate business rules; repositories encapsulate query logic.
+- **Abstraction**: Hide complexity behind clean interfaces. A `CacheService` hides Redis commands behind `get()` / `set()` / `invalidate()`.
+- **Polymorphism**: Use ABC + method overriding or Protocol classes for duck typing. Prefer `Protocol` for structural subtyping in modern Python.
+- **Composition over Inheritance**: Inject collaborators rather than building deep class hierarchies. Use mixins sparingly and only for orthogonal concerns.
+
+## Key Design Patterns
+
+| Pattern | Python/Flask Use Case |
+|---|---|
+| **Repository** | Encapsulate all DB access behind a repository class per aggregate |
+| **Service Layer** | Orchestrate business logic between routes and repositories |
+| **Factory** | Application factory (`create_app`), object factories for test fixtures |
+| **Strategy** | Swappable algorithms — sorting, ranking, retry policies — passed as callables or classes |
+| **Adapter** | Wrap third-party APIs (Stripe, SendGrid) behind a uniform interface |
+| **Decorator** | Python decorators for auth, caching, rate limiting, logging |
+| **Observer** | Flask signals / blinker for decoupled event handling |
+| **Command** | Encapsulate operations as objects for queuing (Celery tasks) and undo |
+| **Circuit Breaker** | Wrap external service calls; fail fast when downstream is unhealthy |
+| **Registry** | Plugin systems — register source adapters, serializers, or handlers dynamically |
+
+## Rules
+
+- Prefer **pure functions** for utilities — no side effects, easy to test.
+- Use **dataclasses** or **Pydantic models** for value objects and DTOs.
+- Use **`typing.Protocol`** over ABC when you only need structural compatibility.
+- Every abstraction must justify itself with at least 2 concrete use cases — avoid premature abstraction.
+- Favor **flat** module hierarchies over deep nesting. If you need more than 3 levels, reconsider your structure.
+- Use **`__slots__`** on performance-critical classes to reduce memory overhead.
+- Always type-hint function signatures. Use `mypy` or `pyright` in strict mode.
