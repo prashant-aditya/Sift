@@ -1,197 +1,1204 @@
-# Sift — Frontend Engineering Specification
+# Sift Frontend — Day-by-Day Execution Roadmap
 
-> **Audience:** Frontend Engineering Team
-> **Stack:** Next.js 14 (App Router) · Tailwind CSS · shadcn/ui · Lucide Icons · v0.dev (scaffolding)
+> **Total Duration:** 6 Weeks (30 Working Days)
+> **Phases:** 4 | **Sprints:** 6
+> **Stack:** Next.js 14 (App Router) · Tailwind CSS · shadcn/ui · Lucide Icons · D3.js · Recharts
 > **Hosting:** Vercel (free tier)
-> **Backend API:** FastAPI (Server-Sent Events for streaming)
+> **Backend:** Assumed available — FastAPI with SSE streaming (developed separately)
+
+---
+
+## How to Use This Roadmap
+
+Each day has:
+- **Goal** — What you should accomplish by end of day
+- **Tasks** — Specific, checkboxable items
+- **Checkpoint** — How you know you're done (testable acceptance criteria)
+
+The frontend is developed independently from the backend. Where the backend isn't ready, use **mock SSE streams** or **static JSON fixtures** to develop against the [API contracts](#api-contracts--sse-protocol-reference) documented at the end of this file.
 
 ---
 
 ## Table of Contents
 
-1. [Product Overview](#1-product-overview)
-2. [Tech Stack & Tooling](#2-tech-stack--tooling)
-3. [Project Structure](#3-project-structure)
-4. [Design System & UI Principles](#4-design-system--ui-principles)
-5. [Pages & Routing](#5-pages--routing)
-6. [Component Specifications](#6-component-specifications)
-7. [Custom Hooks](#7-custom-hooks)
-8. [API Contracts & SSE Protocol](#8-api-contracts--sse-protocol)
-9. [State Management](#9-state-management)
-10. [Authentication Flow](#10-authentication-flow)
-11. [Phased Implementation Plan](#11-phased-implementation-plan)
-12. [Docker & Deployment](#12-docker--deployment)
-13. [Testing Strategy](#13-testing-strategy)
-14. [Performance Requirements](#14-performance-requirements)
-15. [Accessibility & Responsiveness](#15-accessibility--responsiveness)
+- [Phase 1 — Core Research UI (Days 1–7)](#phase-1--core-research-ui-days-17)
+- [Phase 2 — Sessions, Auth & Follow-ups (Days 8–14)](#phase-2--sessions-auth--follow-ups-days-814)
+- [Phase 3 — Knowledge Graph, Dashboard & Export (Days 15–24)](#phase-3--knowledge-graph-dashboard--export-days-1524)
+- [Phase 4 — Agent Reasoning UI & Final Polish (Days 25–30)](#phase-4--agent-reasoning-ui--final-polish-days-2530)
+- [API Contracts & SSE Protocol Reference](#api-contracts--sse-protocol-reference)
+- [Tech Stack Reference](#tech-stack-reference)
+- [Project Structure](#project-structure)
+- [Environment Variables](#environment-variables)
 
 ---
 
-## 1. Product Overview
+## Phase 1 — Core Research UI (Days 1–7)
 
-Sift is an AI deep research engine. Users type a research question, and Sift:
+> **Deliverable:** Users can type a research query, see sources searching in real-time, and read a streamed cited answer. Responsive, accessible, dark-mode ready.
 
-1. Decomposes the query into sub-queries
-2. Searches 5+ sources in parallel (DuckDuckGo, Reddit, HackerNews, ArXiv, Wikipedia)
-3. Streams a synthesized, cited answer in real-time via SSE
-4. Persists the research session into a knowledge graph
+---
 
-The frontend must feel like **Perplexity AI** — clean, fast, streaming-first — but with added features: session history, knowledge graph visualization, source control, and agent reasoning transparency.
+#### Day 1 — Project Setup + Design System
 
-### Core User Flows
+**Goal:** Next.js app runs with shadcn/ui, dark mode, Inter font, all theme tokens configured. Foundation layer (`lib/`, `types/`) ready.
+
+- [x] Initialize project:
+  ```bash
+  npx create-next-app@latest frontend --typescript --tailwind --app --src-dir --eslint
+  ```
+- [x] Initialize shadcn/ui:
+  ```bash
+  npx shadcn@latest init  # New York style, Zinc, CSS variables
+  npx shadcn@latest add button input badge card dialog sheet tabs scroll-area separator tooltip avatar dropdown-menu checkbox slider select command popover toggle collapsible switch label
+  ```
+- [x] Install all dependencies:
+  ```bash
+  npm install lucide-react react-markdown remark-gfm eventsource-parser d3 @types/d3 recharts date-fns zod react-hook-form @hookform/resolvers next-themes @supabase/supabase-js @supabase/auth-helpers-nextjs
+  ```
+- [x] Set up `next-themes` dark mode provider in root `layout.tsx`
+- [x] Set up `Inter` font via `next/font/google`
+- [x] Configure `globals.css` with shadcn theme tokens + indigo primary color override
+- [x] Create `.env.local.example`:
+  ```
+  NEXT_PUBLIC_API_URL=http://localhost:8000
+  NEXT_PUBLIC_SUPABASE_URL=
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=
+  ```
+- [x] Create `src/lib/api.ts` — base fetch wrapper with auth token header support
+- [x] Create `src/lib/constants.ts` — source configs:
+  | Source | Color | Icon |
+  |--------|-------|------|
+  | DuckDuckGo | `orange-500` | `Globe` |
+  | Reddit | `red-500` | `MessageCircle` |
+  | HackerNews | `amber-600` | `Flame` |
+  | ArXiv | `blue-600` | `GraduationCap` |
+  | Wikipedia | `slate-600` | `BookOpen` |
+- [x] Create `src/lib/utils.ts` — `cn()` helper (shadcn), `formatDate()`, `truncateUrl()`
+- [x] Create `src/types/research.ts` — `ResearchRequest`, `Citation`, `SSEEvent`, `SourceStatus`, `ResearchDepth`
+- [x] Create `src/types/session.ts` — `Session`, `SessionDetail`, `ResearchTurn`
+- [x] Create `src/types/knowledge.ts` — `Entity`, `Relationship`, `GraphData`
+- [x] Create `src/types/agent.ts` — `AgentEvent`, `AgentTrace`
+
+**Checkpoint:**
+- [x] `npm run dev` → blank page on `localhost:3000`
+- [x] Dark mode toggle works (system preference detected)
+- [x] Inter font loads correctly
+- [x] `npm run build` passes with zero errors
+
+---
+
+#### Day 2 — SearchBar + Source Toggles + useSSE Hook
+
+**Goal:** User can type a query, toggle sources, and submit. SSE hook can parse events from any SSE endpoint (or mock).
+
+**Morning — SourceToggle + SearchBar:**
+- [x] Create `components/research/SourceToggle.tsx`:
+  - Pill-shaped toggle: source Lucide icon + name
+  - Active: filled background with source color
+  - Inactive: outline with muted text
+  - `aria-pressed` for accessibility
+- [x] Create `components/research/SearchBar.tsx`:
+  - Large centered input, placeholder: `"What would you like to research?"`
+  - Row of `SourceToggle` pills below (all on by default)
+  - Submit on `Enter` or click button (Lucide `ArrowRight`)
+  - Validation: min 3 chars, max 2000 chars (show character count near limit)
+  - Disabled state while streaming
+  - Optional depth selector: `quick | standard | deep` (shadcn `Select`)
+  - Props: `onSubmit(query, sources, depth)`, `isStreaming`, `defaultSources?`
+- [x] Scaffold landing state in `app/page.tsx`: centered SearchBar on the page (Perplexity-style)
+- [x] Wire keyboard handler: `Enter` to submit, `Tab` through toggles
+
+**Afternoon — useSSE Hook:**
+- [x] Create `src/hooks/useSSE.ts`:
+  - Uses `fetch()` with `ReadableStream` reader (not `EventSource` — POST support needed)
+  - Parses SSE with `eventsource-parser` library's `createParser()`
+  - Handles reconnection on network errors (max 3 retries with backoff)
+  - Supports `AbortController` for cancellation
+  - Interface:
+    ```typescript
+    interface UseSSEReturn {
+      start: () => void;
+      abort: () => void;
+      isConnected: boolean;
+      error: Error | null;
+    }
+    ```
+- [x] Create `src/lib/mock-sse.ts` — mock SSE stream for development without backend:
+  - Returns simulated `status`, `source_complete`, `token`, `complete` events with realistic delays
+  - Toggleable via `NEXT_PUBLIC_USE_MOCK=true` env var
+
+**Checkpoint:**
+- [x] SearchBar renders centered, toggles switch on/off visually
+- [x] Submitting logs query + sources + depth to console
+- [x] `useSSE` parses SSE events from either real backend or mock stream
+- [x] Keyboard-only: Tab to toggles, Enter to submit
+
+---
+
+#### Day 3 — useResearch Hook + Source/Phase Indicators + ResearchStream
+
+**Goal:** Full research state machine wired up. Source pills update live. Streamed markdown renders beautifully.
+
+**Morning — useResearch + Indicators:**
+- [ ] Create `src/hooks/useResearch.ts`:
+  - State machine: `idle → decomposing → searching → processing → synthesizing → complete → error`
+  - Wraps `useSSE` internally
+  - Maps SSE events to state updates:
+    - `status` → update `phase`
+    - `source_complete` → update `sourceStatuses[]`
+    - `token` → append to `tokens` string
+    - `complete` → set phase, populate `citations[]` + `sessionId`
+    - `agent_*` → append to `agentEvents[]` (Phase 4 prep)
+  - Returns: `phase`, `tokens`, `citations`, `sourceStatuses`, `sessionId`, `agentEvents`, `error`, `startResearch()`, `startFollowUp()`, `reset()`
+- [ ] Create `components/research/PhaseIndicator.tsx`:
+  - Subtle text + Lucide icon above stream area
+  - Phases: "Decomposing query..." (`BrainCircuit`) → "Searching N sources..." (`Search`) → "Processing results..." (`Cog`) → "Synthesizing answer..." (`Sparkles`)
+  - Fade-out / fade-in transition between phases
+- [ ] Create `components/research/SourceIndicator.tsx`:
+  - Horizontal row of status pills, one per active source
+  - Per source: `waiting` (gray) → `searching` (blue, `Loader2` + `animate-spin`) → `done` (green, `Check`, count + latency) → `error` (red, `AlertCircle`, tooltip with message)
+  - Updates in real-time from `sourceStatuses`
+
+**Afternoon — ResearchStream:**
+- [ ] Create `components/research/ResearchStream.tsx`:
+  - `react-markdown` + `remark-gfm` for rendering (tables, lists, bold, headers, code blocks)
+  - **Citation rendering:** regex `/\[(\d+)\]/g` in paragraph text → clickable superscript badges
+  - Citation badge: on hover → tooltip with source title + URL; on click → scroll to sidebar / open URL
+  - Typing cursor (blinking `|`) at end of text while streaming
+  - Auto-scroll to bottom as content grows
+  - "Scroll to bottom" floating button if user scrolls up
+  - Custom markdown renderers:
+    - `p` — `mb-4 leading-7`, parse citations
+    - `h2` — `text-xl font-semibold mt-6 mb-3`
+    - `code` — inline vs block styling
+  - Props: `tokens`, `citations[]`, `isStreaming`, `onCitationClick(id)`
+
+**Checkpoint:**
+- [ ] Submit query → PhaseIndicator transitions through all states
+- [ ] Source pills update in real-time as `source_complete` events arrive
+- [ ] Markdown answer streams token-by-token with proper formatting
+- [ ] `[1]`, `[2]` rendered as clickable superscript badges with tooltips
+- [ ] Auto-scroll works, "scroll to bottom" button appears on user scroll-up
+
+---
+
+#### Day 4 — Citations + ResearchView Composition + Page Layout
+
+**Goal:** Full end-to-end flow: query → phases → sources → streamed answer with citations panel. Responsive two-column layout.
+
+**Morning — Citations:**
+- [ ] Create `components/research/CitationCard.tsx`:
+  - Shows: citation number badge (colored by source), title, source name with icon + color, URL (truncated, linked), relevance score progress bar
+  - Click → opens source URL in new tab (`rel="noopener noreferrer"`)
+  - `isHighlighted` prop → pulsing border animation when scrolled to from in-text click
+  - Props: `citation: Citation`, `isHighlighted?: boolean`
+- [ ] Create `components/research/CitationSidebar.tsx`:
+  - Right sidebar (desktop) using `ScrollArea`
+  - Bottom `Sheet` (mobile)
+  - Citations grouped by source type, each group with source icon + count header
+  - Sorted by relevance within each group (descending)
+  - Only appears after citations arrive
+
+**Afternoon — ResearchView + Page Wiring:**
+- [ ] Create `components/research/ResearchView.tsx`:
+  - Composes: `PhaseIndicator` + `SourceIndicator` + `ResearchStream` + `CitationSidebar`
+  - Manages citation highlight state (which citation is focused)
+- [ ] Wire into `app/page.tsx`:
+  - Default state: centered `SearchBar` (hero)
+  - On submit: `SearchBar` transitions to top, `ResearchView` appears below
+  - Layout: `grid grid-cols-1 lg:grid-cols-[1fr_320px]` (stream + sidebar on desktop)
+- [ ] Citation click flow: `[1]` in answer → `onCitationClick(1)` → scroll CitationSidebar to card #1, highlight it
+
+**Checkpoint:**
+- [ ] Full flow: type query → see phases → see sources → read streamed answer → citations panel
+- [ ] Click `[1]` in answer → citation #1 highlights in sidebar
+- [ ] Desktop (>1024px): two-column (stream + sidebar)
+- [ ] Mobile (<640px): single column, citations below answer
+- [ ] No visual glitches in both light and dark mode
+
+---
+
+#### Day 5 — Dark Mode Polish + Empty States + Accessibility
+
+**Goal:** App is visually polished across all states and breakpoints. WCAG AA on core flow.
+
+- [ ] Verify every component in dark mode — fix any contrast or color issues
+- [ ] Add empty states:
+  - Landing: clean hero with SearchBar + subtle tagline
+  - No results: "No sources returned results. Try a different query." + retry button
+  - Error: friendly message with error details (collapsible) + retry button
+- [ ] Add loading skeleton for initial page load (`Skeleton` component from shadcn)
+- [ ] Add `prefers-reduced-motion` media query:
+  - Disable typing cursor animation
+  - Disable phase fade transitions
+  - Disable citation highlight pulse
+- [ ] Accessibility pass:
+  - `aria-live="polite"` on streaming text region + phase indicator
+  - `aria-pressed` on source toggles
+  - `aria-label="Source N: <title>"` on citation badges
+  - Keyboard navigation: Tab through all interactive elements, Enter/Space to activate
+  - Focus management: focus search input on page load
+- [ ] Test responsiveness at: 375px, 640px, 768px, 1024px, 1440px
+- [ ] Minimum touch targets: 44x44px on mobile
+
+**Checkpoint:**
+- [ ] Dark mode: correct contrast on all components (no invisible text)
+- [ ] Empty/error/loading states render correctly
+- [ ] Keyboard-only navigation works for full research flow
+- [ ] No layout breaks between 375px and 1440px
+- [ ] `prefers-reduced-motion` disables all animations
+
+---
+
+#### Day 6 — Dockerfile + Vercel Prep + Frontend Tests
+
+**Goal:** Frontend containerizable. Build passes for Vercel. Core hooks have unit tests.
+
+**Morning — Docker + Build:**
+- [ ] Create `frontend/Dockerfile`:
+  ```dockerfile
+  FROM node:18-alpine AS builder
+  WORKDIR /app
+  COPY package.json package-lock.json ./
+  RUN npm ci
+  COPY . .
+  RUN npm run build
+
+  FROM node:18-alpine AS runner
+  WORKDIR /app
+  ENV NODE_ENV=production
+  COPY --from=builder /app/public ./public
+  COPY --from=builder /app/.next/standalone ./
+  COPY --from=builder /app/.next/static ./.next/static
+  EXPOSE 3000
+  CMD ["node", "server.js"]
+  ```
+- [ ] Add `output: 'standalone'` to `next.config.js` (for Docker)
+- [ ] Verify: `npm run build` passes cleanly
+- [ ] Verify: `docker build -t sift-frontend .` succeeds
+
+**Afternoon — Frontend Tests:**
+- [ ] Install: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
+- [ ] Configure `vitest.config.ts`
+- [ ] Write tests:
+  | Test | What it validates |
+  |------|-------------------|
+  | `SearchBar.test.tsx` | Submit emits correct query + sources; validation rejects <3 chars; disabled while streaming |
+  | `SourceToggle.test.tsx` | Toggle state changes on click; renders correct icon + color |
+  | `useSSE.test.ts` | Parses SSE event format correctly; handles abort; handles connection error |
+  | `useResearch.test.ts` | State transitions through all phases; tokens accumulate; citations populated on complete |
+  | `CitationCard.test.tsx` | Renders title, URL, source icon; highlight animation triggers |
+  | `SourceIndicator.test.tsx` | Shows correct state for waiting/searching/done/error |
+- [ ] Setup CI-compatible test command: `npx vitest run`
+
+**Checkpoint:**
+- [ ] `npm run build` — zero errors
+- [ ] `docker build` — succeeds
+- [ ] `npx vitest run` — all tests pass
+- [ ] All tests run without backend dependency (mocked)
+
+---
+
+#### Day 7 — Buffer / Integration Polish
+
+**Goal:** Phase 1 complete. No rough edges. Ready to build on.
+
+- [ ] Fix any failing tests or visual bugs from the week
+- [ ] Test full flow with mock SSE and (if available) real backend
+- [ ] Ensure `SearchBar` → `ResearchView` transition animation is smooth
+- [ ] Review code: remove TODO comments, clean up unused imports
+- [ ] Verify dark mode one final time across all components
+- [ ] `npm run lint` — zero warnings
+
+**Checkpoint:**
+- [ ] Phase 1 exit criteria met (below)
+
+---
+
+### Phase 1 Exit Criteria
+
+- [ ] All 7 days completed
+- [ ] Full research flow works: query → phases → sources → streamed answer → citations
+- [ ] Responsive on mobile (375px) through desktop (1440px)
+- [ ] Dark mode fully functional
+- [ ] Accessible: keyboard navigable, aria labels, reduced motion
+- [ ] Core hooks and components have unit tests
+- [ ] `npm run build` and `docker build` both pass
+- [ ] Works with mock SSE (no backend dependency for development)
+
+---
+---
+
+## Phase 2 — Sessions, Auth & Follow-ups (Days 8–14)
+
+> **Deliverable:** Authenticated users have persistent session history, can ask follow-ups, and see a polished navigation shell. Anonymous users can still research.
+
+---
+
+#### Day 8 — AppShell + Session Sidebar
+
+**Goal:** App has a layout shell with a collapsible session sidebar. Sessions load from API (or mock).
+
+- [ ] Create `src/hooks/useSession.ts`:
+  - `sessions[]`, `isLoading`, `fetchSessions()`, `getSession(id)`, `archiveSession(id)`, `renameSession(id, title)`
+  - Fetches from `GET /api/v1/sessions` (with mock fallback)
+- [ ] Create `components/layout/AppShell.tsx`:
+  - Main layout wrapper: sidebar (left) + content area (right)
+  - Sidebar width: `280px` on desktop, full-screen `Sheet` on mobile
+  - Collapsible via toggle button
+- [ ] Create `components/layout/SessionSidebar.tsx`:
+  - "New Research" button at top (Lucide `Plus`)
+  - Search/filter input
+  - Session list grouped by date: "Today", "Yesterday", "This Week", "Older" (using `date-fns`)
+  - Each item: title, date, query count badge
+  - Click → navigates to `/session/[id]` or loads in main content
+  - Ghost button variant for list items
+  - `ScrollArea` for long lists
+  - Desktop: collapsible; Mobile: `Sheet` drawer
+
+**Checkpoint:**
+- [ ] Sidebar lists sessions (from API or mock data)
+- [ ] Sessions grouped by date correctly
+- [ ] "New Research" navigates to home/landing
+- [ ] Desktop: sidebar collapsible; Mobile: opens as Sheet
+- [ ] Search/filter narrows the list
+
+---
+
+#### Day 9 — Session Detail Page + Follow-up Input
+
+**Goal:** Clicking a past session loads its full conversation. Users can ask follow-ups.
+
+**Morning — Session Detail Page:**
+- [ ] Create `app/session/[id]/page.tsx`:
+  - Fetches session from `GET /api/v1/sessions/{id}`
+  - Displays full conversation: all turns in chronological order
+  - Each turn: user query (styled as chat bubble / heading), synthesized answer (markdown), citations
+  - Session metadata header: title, date, query count, sources used
+  - Loading skeleton while fetching
+
+**Afternoon — Follow-up Input:**
+- [ ] Create `components/research/FollowUpInput.tsx`:
+  - Compact input below completed answer: placeholder `"Ask a follow-up..."`
+  - Submit sends to `POST /api/v1/research/{session_id}/followup`
+  - New streamed answer appends below previous in conversation thread
+  - Disabled while streaming
+  - Props: `sessionId`, `isStreaming`, `onSubmit(query)`
+- [ ] Wire follow-up into main research page:
+  - After initial research completes → show `FollowUpInput`
+  - On follow-up submit → stream new answer below, growing the conversation
+
+**Checkpoint:**
+- [ ] `/session/abc123` loads full conversation with all turns
+- [ ] Follow-up input appears after research completes
+- [ ] Follow-up answer streams below previous answer (conversation grows)
+- [ ] Loading skeleton shows while session data loads
+
+---
+
+#### Day 10 — Auth UI: Login, Signup, UserMenu
+
+**Goal:** Users can sign up, log in (email + GitHub), and log out. Auth state available app-wide.
+
+- [ ] Create `src/lib/supabase.ts`: browser + server Supabase client initialization
+- [ ] Create `src/hooks/useAuth.ts`:
+  - `user`, `isLoading`, `isAuthenticated`
+  - `signIn(email, password)`, `signUp(email, password)`, `signInWithGitHub()`, `signOut()`
+- [ ] Create `components/auth/LoginForm.tsx`:
+  - Email + password fields (React Hook Form + Zod validation)
+  - "Sign in with GitHub" button
+  - Link to signup page
+  - Error messages for invalid credentials
+- [ ] Create `components/auth/SignupForm.tsx`:
+  - Email + password + confirm password
+  - Password strength indicator (optional)
+  - Link to login page
+- [ ] Create `components/auth/UserMenu.tsx`:
+  - Avatar + name in `DropdownMenu`
+  - Items: Profile (placeholder), Settings, Logout
+- [ ] Create `app/auth/login/page.tsx` — renders `LoginForm` centered
+- [ ] Create `app/auth/signup/page.tsx` — renders `SignupForm` centered
+- [ ] Create `app/auth/callback/route.ts` — Supabase OAuth redirect handler
+
+**Checkpoint:**
+- [ ] Signup → email confirmation → login works
+- [ ] GitHub OAuth redirects and completes (if Supabase configured)
+- [ ] `useAuth().isAuthenticated` reflects login state
+- [ ] UserMenu shows avatar/email after login
+- [ ] Logout clears session
+
+---
+
+#### Day 11 — Header + Mobile Nav + Protected Routes
+
+**Goal:** Complete navigation shell. Protected routes redirect to login. Anonymous mode works.
+
+- [ ] Create `components/layout/Header.tsx`:
+  - Logo (left), dark mode toggle (Lucide `Sun`/`Moon`), UserMenu or "Sign in" button (right)
+  - Clean, minimal top bar
+- [ ] Create `components/layout/MobileNav.tsx`:
+  - Hamburger button → opens `SessionSidebar` as `Sheet`
+  - Visible only on mobile (<1024px)
+- [ ] Wire `Header` + `MobileNav` + `SessionSidebar` into `AppShell`
+- [ ] Implement anonymous mode:
+  - Research works without auth → session stored in `localStorage` (ephemeral)
+  - "Save this session" button prompts sign-in modal
+  - Session sidebar hidden for unauthenticated users
+- [ ] Create `middleware.ts` (Next.js middleware):
+  - Protected routes: `/session/*`, `/knowledge`, `/dashboard`, `/settings/*`
+  - Redirect unauthenticated → `/auth/login?redirect=<original_url>`
+  - Unprotected: `/`, `/auth/*`
+
+**Checkpoint:**
+- [ ] Header renders logo + dark mode toggle + user menu (or "Sign in")
+- [ ] Mobile: hamburger opens sidebar as Sheet
+- [ ] Anonymous user: can research, no sidebar, "Sign in to save" CTA
+- [ ] Authenticated user: sidebar visible, sessions load
+- [ ] Navigating to `/dashboard` while logged out → redirects to `/auth/login`
+
+---
+
+#### Day 12 — Source Indicator Expansion + Frontend CI
+
+**Goal:** All 5 sources have correct icons/colors. CI pipeline validates lint + build + test.
+
+**Morning — Dynamic Source Support:**
+- [ ] Update `SourceToggle` and `SourceIndicator` to support all 5 sources:
+  - DuckDuckGo (`orange-500`, `Globe`)
+  - Reddit (`red-500`, `MessageCircle`)
+  - HackerNews (`amber-600`, `Flame`)
+  - ArXiv (`blue-600`, `GraduationCap`)
+  - Wikipedia (`slate-600`, `BookOpen`)
+- [ ] Make source list dynamic: optionally fetch from `GET /api/v1/sources`
+  - Fallback to hardcoded `constants.ts` if API unavailable
+
+**Afternoon — CI Pipeline:**
+- [ ] Create `.github/workflows/frontend-ci.yml`:
+  ```yaml
+  jobs:
+    frontend:
+      steps:
+        - npm ci
+        - npm run lint
+        - npm run build
+        - npx vitest run
+  ```
+- [ ] Verify pipeline passes locally before pushing
+- [ ] Set branch protection: require CI pass on PRs
+
+**Checkpoint:**
+- [ ] All 5 sources render with correct icon and color in both SourceToggle and SourceIndicator
+- [ ] CI pipeline runs lint + build + test on push
+- [ ] CI passes with zero failures
+
+---
+
+#### Day 13 — Vercel Deployment + Production Smoke Test
+
+**Goal:** Frontend deployed to Vercel. Works against production (or staging) backend API.
+
+- [ ] **Vercel setup:**
+  - Connect GitHub repo → auto-deploy `frontend/` directory
+  - Root directory: `frontend`
+  - Framework preset: Next.js
+  - Environment variable: `NEXT_PUBLIC_API_URL=<backend_url>` (or mock service URL)
+  - Environment variable: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- [ ] Verify `npm run build` passes on Vercel
+- [ ] Test SSE streaming works over Vercel's edge network (potential buffering issues — may need `next.config.js` adjustments)
+- [ ] Smoke test checklist:
+  - [ ] Frontend loads at Vercel URL
+  - [ ] Dark mode works
+  - [ ] Research query streams answer (mock or real backend)
+  - [ ] Auth flow works (signup, login, logout)
+  - [ ] Session sidebar loads after auth
+  - [ ] Follow-up input works
+  - [ ] Mobile layout correct
+
+**Checkpoint:**
+- [ ] Frontend accessible at public Vercel URL
+- [ ] All smoke tests pass
+- [ ] No CORS errors or broken SSE connections
+
+---
+
+#### Day 14 — Phase 2 Buffer / Polish
+
+**Goal:** Phase 2 complete. Navigation, auth, and sessions are rock-solid.
+
+- [ ] Fix any bugs from the week
+- [ ] Test full flow: anonymous research → sign up → see session saved → follow-up
+- [ ] Run `npx vitest run` — all pass
+- [ ] Run `npm run lint` — zero warnings
+- [ ] Visual review on mobile (375px) and desktop (1440px)
+
+**Checkpoint:**
+- [ ] Phase 2 exit criteria met (below)
+
+---
+
+### Phase 2 Exit Criteria
+
+- [ ] All 7 days (Days 8–14) completed
+- [ ] Session sidebar loads, groups by date, click to view
+- [ ] Session detail page shows full conversation
+- [ ] Follow-up questions stream below previous answer
+- [ ] Auth: signup, login, GitHub OAuth, logout all work
+- [ ] Anonymous mode: research works, "sign in to save" prompt shown
+- [ ] Protected routes redirect to login
+- [ ] Deployed on Vercel
+- [ ] CI pipeline passing
+
+---
+---
+
+## Phase 3 — Knowledge Graph, Dashboard & Export (Days 15–24)
+
+> **Deliverable:** Interactive knowledge graph, analytics dashboard, session export, scheduled research UI, and notification system.
+
+---
+
+#### Day 15 — D3.js Force-Directed Graph (Rendering)
+
+**Goal:** Knowledge graph renders with nodes and edges. Entity types visually distinguishable.
+
+- [ ] Create `src/hooks/useKnowledge.ts`:
+  - Fetches graph data from `GET /api/v1/knowledge/graph` or `GET /api/v1/sessions/{id}/graph`
+  - Returns: `graphData`, `isLoading`, `error`, `refetch()`
+  - Mock data fallback: 30–50 entities with relationships for development
+- [ ] Create `components/knowledge/KnowledgeGraph.tsx`:
+  - D3.js `d3-force` simulation with collision detection
+  - Nodes: circles sized by `mention_count`, colored by entity type
+  - Entity type color palette:
+    | Type | Color | Icon |
+    |------|-------|------|
+    | technology | `blue-500` | `Cpu` |
+    | concept | `purple-500` | `Lightbulb` |
+    | organization | `green-500` | `Building2` |
+    | person | `orange-500` | `User` |
+    | pattern | `teal-500` | `Layers` |
+    | algorithm | `red-500` | `Binary` |
+    | protocol | `cyan-500` | `Network` |
+    | library | `pink-500` | `Package` |
+    | service | `emerald-500` | `Cloud` |
+  - Edges: lines labeled with relationship type, opacity weighted by confidence
+  - Dynamic import D3.js (only on `/knowledge` — code splitting)
+
+**Checkpoint:**
+- [ ] Graph renders with nodes colored by type, sized by mentions
+- [ ] Edges labeled with relationship types
+- [ ] D3 bundle only loads on `/knowledge` page
+
+---
+
+#### Day 16 — D3.js Graph (Interaction)
+
+**Goal:** Graph is fully interactive — drag, zoom, click, hover. Performant for 200 nodes.
+
+- [ ] Add drag: click + drag repositions nodes
+- [ ] Add zoom/pan: mouse wheel zooms, drag on background pans
+- [ ] Add click: click node → opens `EntityDetail` panel (wired next day)
+- [ ] Add hover: hover node → highlight connected edges and neighbor nodes, dim everything else
+- [ ] Performance: switch to `<canvas>` rendering for >100 nodes
+- [ ] Graph views (toggle buttons above graph):
+  - Full graph — all entities
+  - Session graph — filtered to specific session
+  - Entity neighborhood — selected entity + 1-2 hop connections
+
+**Checkpoint:**
+- [ ] Drag, zoom, pan all smooth
+- [ ] Hover highlights connections (rest dims)
+- [ ] <1s render for 200 nodes
+- [ ] View toggles work
+
+---
+
+#### Day 17 — Entity Detail Panel + Graph Controls + Legend
+
+**Goal:** Clicking a node shows full entity details. Filter controls narrow the graph.
+
+- [ ] Create `components/knowledge/EntityDetail.tsx`:
+  - Slide-in `Sheet` panel on node click
+  - Shows: entity name, type badge (colored), description
+  - Stats: mention count, first seen date, last seen date
+  - "Sessions" section: list of sessions where entity appears (links to `/session/[id]`)
+  - "Related entities" section: directly connected entities (clickable → refocuses graph)
+  - "Research more" button → navigates to `/` with entity name as prefilled query
+- [ ] Create `components/knowledge/GraphControls.tsx`:
+  - Entity type: checkboxes (filter by type)
+  - Session: `Select` dropdown (show only entities from a session)
+  - Min mentions: `Slider` (hide rarely-mentioned entities)
+  - Filters apply reactively to the graph
+- [ ] Create `components/knowledge/GraphLegend.tsx`:
+  - Color legend for entity types (horizontal strip below graph)
+
+**Checkpoint:**
+- [ ] Click node → EntityDetail Sheet opens with all fields
+- [ ] "Research more" prefills SearchBar and navigates home
+- [ ] Type filters hide/show nodes
+- [ ] Min mentions slider removes low-count nodes
+- [ ] Legend clearly maps colors to types
+
+---
+
+#### Day 18 — Knowledge Page Assembly
+
+**Goal:** `/knowledge` route is a complete, polished page.
+
+- [ ] Create `app/knowledge/page.tsx`:
+  - Layout: graph area (main) + controls sidebar (left or top) + entity detail (right Sheet)
+  - Full graph loads by default
+  - Controls collapse on mobile (behind a filter button)
+  - Loading state while graph fetches
+  - Empty state: "Start researching to build your knowledge graph"
+- [ ] Responsive: graph takes full width, controls as drawer on mobile
+- [ ] Performance: verify 200-node render in <1s
+- [ ] Test: changing filters re-renders graph smoothly
+
+**Checkpoint:**
+- [ ] `/knowledge` page loads graph + controls + detail panel
+- [ ] Mobile: graph fullscreen, controls in drawer
+- [ ] Empty state shows for new users
+- [ ] Visually compelling (portfolio screenshot quality)
+
+---
+
+#### Day 19 — Export Menu + Share Dialog
+
+**Goal:** Sessions exportable. Sessions shareable via link.
+
+**Morning — Export:**
+- [ ] Create `components/shared/ExportMenu.tsx`:
+  - `DropdownMenu` on session page header
+  - Options: "Export as Markdown", "Export as JSON", "Export to Obsidian"
+  - Markdown/JSON: `GET /api/v1/sessions/{id}/export?format=<fmt>` → trigger download via `<a download>` or `URL.createObjectURL`
+  - Obsidian (knowledge-level): `GET /api/v1/knowledge/export?format=obsidian` → ZIP download
+
+**Afternoon — Share:**
+- [ ] Create `components/shared/ShareDialog.tsx`:
+  - `Dialog` modal triggered by "Share" button on session page
+  - Role selector: Viewer / Editor (shadcn `Select`)
+  - "Generate Link" button → calls API → shows link
+  - "Copy Link" button → clipboard
+  - Shared session indicator: avatar pills of collaborators
+
+**Checkpoint:**
+- [ ] Export dropdown triggers file downloads for each format
+- [ ] Share dialog generates link, copy-to-clipboard works
+- [ ] Share link opens session for viewer
+
+---
+
+#### Day 20 — Dashboard: Activity Chart + Source Performance
+
+**Goal:** `/dashboard` page with first two chart components.
+
+- [ ] Create `app/dashboard/page.tsx` — layout with grid of chart cards
+- [ ] Create `components/dashboard/ActivityChart.tsx`:
+  - Recharts `LineChart` — queries per week (time series)
+  - Responsive, dark-mode compatible colors
+- [ ] Create `components/dashboard/SourcePerformance.tsx`:
+  - Table: source name (with icon), avg latency (bar visualization), success rate %, circuit breaker status badge
+  - Sortable columns
+- [ ] Data from `GET /api/v1/analytics` (with mock fallback)
+- [ ] Dynamic import Recharts (only on `/dashboard`)
+
+**Checkpoint:**
+- [ ] Activity chart renders with time series data
+- [ ] Source performance table shows all 5 sources with stats
+- [ ] Recharts bundle only loads on `/dashboard`
+
+---
+
+#### Day 21 — Dashboard: Cache Stats + Top Entities + Knowledge Stats
+
+**Goal:** Dashboard complete with all 5 stat/chart components.
+
+- [ ] Create `components/dashboard/CacheStats.tsx`:
+  - Recharts `RadialBarChart` or custom progress ring — cache hit rate percentage
+  - Shows: hit rate, avg hit latency, avg miss latency
+- [ ] Create `components/dashboard/TopEntities.tsx`:
+  - Recharts `BarChart` (horizontal) — top 10 entities by mention count
+  - Colored by entity type
+- [ ] Create `components/dashboard/KnowledgeStats.tsx`:
+  - Stat cards (shadcn `Card`): total nodes, total edges, total sessions, growth trend
+- [ ] Responsive grid: 2-column on desktop, single column on mobile
+- [ ] Dashboard loading skeleton
+
+**Checkpoint:**
+- [ ] Dashboard loads in <2s with all 5 components
+- [ ] All charts render with real or mock data
+- [ ] Responsive: cards stack on mobile
+- [ ] Loading skeleton shows while data fetches
+
+---
+
+#### Day 22 — Scheduled Research UI + Settings Page
+
+**Goal:** Users can manage research schedules from settings.
+
+- [ ] Create `app/settings/page.tsx`: general settings (theme preference, default sources — placeholder for now)
+- [ ] Create `app/settings/schedules/page.tsx`:
+  - Form to create schedule (React Hook Form + Zod):
+    - Query template: text input
+    - Topics: tag input (comma-separated or chip input)
+    - Frequency: `daily` | `weekly` (shadcn `Select`)
+    - Source selection: checkboxes
+  - List existing schedules:
+    - Each row: query template, frequency, last run, active/paused `Switch` toggle
+    - Edit and delete actions
+  - API: `POST/GET/PATCH/DELETE /api/v1/schedules`
+
+**Checkpoint:**
+- [ ] Create schedule via form → appears in list
+- [ ] Edit, pause/resume, delete work
+- [ ] Form validation catches empty fields, invalid frequency
+
+---
+
+#### Day 23 — Notification System
+
+**Goal:** Notification bell in header with unread count and dropdown.
+
+- [ ] Create `src/hooks/useNotifications.ts`:
+  - Fetches from `GET /api/v1/notifications`
+  - Polls every 60 seconds
+  - `markAsRead(id)` → `PATCH /api/v1/notifications/{id}/read`
+  - Returns: `notifications[]`, `unreadCount`, `markAsRead()`, `isLoading`
+- [ ] Create `components/shared/NotificationBell.tsx`:
+  - Bell icon (Lucide `Bell`) in header
+  - Unread count badge (red dot with number)
+  - `DropdownMenu` with list of recent notifications
+  - Each notification: icon by type, title, body, timestamp
+  - Click notification → navigate to relevant session/suggestion
+  - Mark as read on click
+- [ ] Wire into `Header` component
+
+**Checkpoint:**
+- [ ] Bell shows unread count
+- [ ] Dropdown lists notifications
+- [ ] Click navigates to relevant page
+- [ ] Mark-as-read updates count
+
+---
+
+#### Day 24 — Phase 3 Buffer / Polish
+
+**Goal:** Phase 3 features polished. All pages tested.
+
+- [ ] Smoke test: knowledge graph, dashboard, exports, schedules, notifications
+- [ ] Run full test suite, add new tests for Phase 3 components
+- [ ] Visual review in dark mode
+- [ ] Mobile responsiveness pass on all new pages
+- [ ] Fix any remaining issues
+
+**Checkpoint:**
+- [ ] Phase 3 exit criteria met (below)
+
+---
+
+### Phase 3 Exit Criteria
+
+- [ ] All 10 days (Days 15–24) completed
+- [ ] Knowledge graph renders <1s with 200 nodes, interactive (drag/zoom/click/hover)
+- [ ] Entity detail panel shows all fields with working navigation
+- [ ] Graph filters work (type, session, min mentions)
+- [ ] Dashboard shows 5 chart/stat components with real or mock data
+- [ ] Export triggers file downloads (Markdown, JSON, Obsidian)
+- [ ] Share dialog generates and copies link
+- [ ] Scheduled research UI: create, edit, pause, delete
+- [ ] Notification bell with unread count and dropdown
+- [ ] All pages responsive and dark-mode compatible
+
+---
+---
+
+## Phase 4 — Agent Reasoning UI & Final Polish (Days 25–30)
+
+> **Deliverable:** Agent reasoning transparency, proactive suggestion cards, full accessibility audit, performance benchmarks, and production-ready documentation.
+
+---
+
+#### Day 25 — AgentThinking Component (Real-Time)
+
+**Goal:** Users can watch the agent think during research via a collapsible panel.
+
+- [ ] Create `components/agent/AgentThinking.tsx`:
+  - Collapsible panel above the streaming answer (hidden by default)
+  - "Show agent reasoning" toggle button (off by default, for power users)
+  - Shows agent reasoning steps in real-time as `agent_*` SSE events arrive
+  - Each step: icon + agent type badge + reasoning text + timestamp
+  - Color-coded by agent type:
+    | Agent | Color | Emoji |
+    |-------|-------|-------|
+    | Coordinator | `slate` | thinking |
+    | Academic | `blue` | book |
+    | Practitioner | `amber` | speech |
+    | Fact-checker | `green` | check |
+  - Steps appear with subtle fade-in animation
+  - Each step expandable to show full reasoning text
+  - Uses `Collapsible`, `Badge`, `ScrollArea` from shadcn
+- [ ] Wire to `useResearch` hook: consume `agent_thinking`, `agent_action`, `agent_action_complete`, `agent_evaluation` events
+
+**Checkpoint:**
+- [ ] Toggle shows/hides reasoning panel
+- [ ] Agent steps appear in real-time during research
+- [ ] Color coding matches agent type
+- [ ] Expandable for full reasoning text
+- [ ] Hidden by default — clean UX for casual users
+
+---
+
+#### Day 26 — AgentTrace Component (Post-Research)
+
+**Goal:** After research completes, users can explore the full agent decision timeline.
+
+- [ ] Create `components/agent/AgentTrace.tsx`:
+  - Timeline visualization of all agent iterations (post-research)
+  - Fetches from `GET /api/v1/sessions/{id}/turns/{turn_id}/trace`
+  - Each iteration shows: reasoning → action → result → confidence change
+  - Decision tree: which agents dispatched and why
+  - Expandable details for each step (shadcn `Collapsible` + `Card`)
+  - Links from trace steps to specific citations in the answer
+  - Visual: vertical timeline with connected cards
+- [ ] Add "View Agent Trace" button on completed research (only if trace data available)
+
+**Checkpoint:**
+- [ ] Trace timeline renders with all iterations
+- [ ] Each step expandable with full details
+- [ ] Clicking trace step highlights relevant citation
+- [ ] Clean fallback when no trace data available
+
+---
+
+#### Day 27 — Proactive Suggestion Cards + EmptyState Component
+
+**Goal:** Dashboard shows proactive suggestions. Reusable empty state for all pages.
+
+**Morning — Suggestion Cards:**
+- [ ] Add suggestion section to `/dashboard`:
+  - Fetch from `GET /api/v1/suggestions`
+  - Each card: title, reasoning paragraph, suggested query, "Research Now" button
+  - "Research Now" → `POST /api/v1/suggestions/{id}/execute` → navigate to `/` with streaming
+  - Card types with icons: knowledge_gap (Lucide `CircleHelp`), stale_knowledge (`Clock`), incomplete_comparison (`GitCompare`)
+- [ ] Update `NotificationBell` to include proactive suggestion notifications
+
+**Afternoon — Reusable EmptyState:**
+- [ ] Create `components/shared/EmptyState.tsx`:
+  - Props: `icon`, `title`, `description`, `action?` (button)
+  - Used on: knowledge graph (no entities), dashboard (no data), sessions (no history), schedules (none created)
+- [ ] Apply to all pages that need empty states
+
+**Checkpoint:**
+- [ ] Suggestion cards render on dashboard with mock or real data
+- [ ] "Research Now" triggers research
+- [ ] EmptyState renders on all pages when no data
+
+---
+
+#### Day 28 — Performance Benchmarks + Optimization
+
+**Goal:** All frontend performance targets met. Bundle optimized.
+
+- [ ] Benchmark targets:
+  | Metric | Target |
+  |--------|--------|
+  | First Contentful Paint (FCP) | <1.5s |
+  | Largest Contentful Paint (LCP) | <2.5s |
+  | Time to Interactive (TTI) | <3.5s |
+  | Token rendering lag | <50ms after SSE event |
+  | Knowledge graph (200 nodes) | <1s render |
+  | Dashboard page load | <2s |
+  | Initial JS bundle (gzipped) | <200KB |
+- [ ] Run Lighthouse audit on all pages
+- [ ] Optimization pass:
+  - Verify D3.js dynamic import (only `/knowledge`)
+  - Verify Recharts dynamic import (only `/dashboard`)
+  - Lazy-load `CitationSidebar` on mobile (Sheet, not always rendered)
+  - Use `next/image` for any static images
+  - Virtualize session list if >100 sessions (`react-window`)
+  - Minimize `react-markdown` plugins
+- [ ] Document results
+
+**Checkpoint:**
+- [ ] Lighthouse Performance score ≥ 90 on home page
+- [ ] All metrics within targets (or documented with explanation)
+- [ ] No unnecessary bundles on pages that don't need them
+
+---
+
+#### Day 29 — Accessibility Audit + Final Visual Polish
+
+**Goal:** WCAG AA compliance on all critical flows. Visual perfection.
+
+**Morning — Accessibility:**
+- [ ] Run `axe-core` audit on all pages (install `@axe-core/react` for dev)
+- [ ] Verify keyboard navigation on every page:
+  - Home: Tab to toggles → Enter to submit → Tab to follow-up
+  - Knowledge: Tab to graph controls → Enter to apply
+  - Dashboard: Tab through cards
+  - Auth: Tab through form fields → Enter to submit
+- [ ] Verify screen reader (VoiceOver):
+  - Streaming text region announced with `aria-live="polite"`, `aria-atomic="false"`
+  - Phase indicator announced
+  - Citation links have `aria-label="Source N: <title>"`
+  - Graph nodes have `aria-label` with entity name + type
+- [ ] Check color contrast: 4.5:1 for normal text, 3:1 for large text
+- [ ] Verify `prefers-reduced-motion` → all animations disabled
+- [ ] Focus trapping: modals/dialogs trap focus, closing returns focus to trigger
+- [ ] Fix all critical a11y violations
+
+**Afternoon — Visual Polish:**
+- [ ] Final dark mode review across all pages
+- [ ] Smooth page transitions
+- [ ] Consistent spacing and typography
+- [ ] Toast notifications (shadcn `Sonner` or `Toast`) for: export complete, share link copied, session saved, errors
+
+**Checkpoint:**
+- [ ] Zero critical a11y violations from axe-core
+- [ ] Full flow navigable with keyboard only
+- [ ] Screen reader announces streaming text and phase changes
+- [ ] Toast notifications for key user actions
+
+---
+
+#### Day 30 — Documentation + Screenshots + Demo
+
+**Goal:** Frontend is presentation-ready. Portfolio-quality screenshots and documentation.
+
+- [ ] Take screenshots of every major view (both light and dark mode):
+  - Landing page with SearchBar
+  - Research in progress: streaming answer + source indicators
+  - Completed research with citations sidebar
+  - Agent reasoning panel (expanded)
+  - Knowledge graph with colorful nodes
+  - Entity detail panel
+  - Dashboard with charts
+  - Session sidebar with history
+  - Auth pages
+- [ ] Update `frontend/README.md` with:
+  - Setup instructions (dev + production)
+  - Architecture overview (pages, components, hooks, lib)
+  - API contract summary
+  - Design system reference (colors, fonts, spacing)
+- [ ] Record short demo (optional): screen recording of full research flow
+- [ ] Final checks:
+  - [ ] `npm run lint` — zero warnings
+  - [ ] `npm run build` — zero errors
+  - [ ] `npx vitest run` — all pass
+  - [ ] Vercel deployment green
+
+**Checkpoint:**
+- [ ] All Phase 4 exit criteria met (below)
+- [ ] Screenshots captured for portfolio
+- [ ] Frontend README comprehensive
+- [ ] Production deployment stable
+
+---
+
+### Phase 4 Exit Criteria
+
+- [ ] All 6 days (Days 25–30) completed
+- [ ] Agent reasoning panel shows real-time thinking (togglable)
+- [ ] Agent trace timeline explorable post-research
+- [ ] Proactive suggestion cards actionable on dashboard
+- [ ] Lighthouse Performance ≥ 90
+- [ ] Zero critical a11y violations
+- [ ] All pages keyboard navigable
+- [ ] Screenshots and documentation complete
+- [ ] Production deployment stable on Vercel
+
+---
+---
+
+## Project Completion Summary
 
 ```
-Flow 1: First-time Research
-  Landing → Type query → Toggle sources → Submit
-  → See source status indicators update live
-  → Stream answer with inline citations [1][2]
-  → View citations sidebar
-  → Ask follow-up question
+Day 1-7     Phase 1: Core Research UI            query → streamed cited answer
+Day 8-14    Phase 2: Sessions, Auth, Follow-ups  session history, auth, conversations
+Day 15-24   Phase 3: Knowledge Graph + Dashboard  D3 graph, charts, export, schedules
+Day 25-30   Phase 4: Agent UI + Final Polish      reasoning panel, a11y, performance
 
-Flow 2: Returning User
-  Open app → See session sidebar (past research)
-  → Click old session → View full conversation
-  → Ask follow-up or start new research
-
-Flow 3: Knowledge Exploration
-  Navigate to /knowledge → Interactive graph
-  → Click entity node → See details + sessions
-  → "Research more" → Triggers new query
-
-Flow 4: Dashboard
-  Navigate to /dashboard → Research activity
-  → Source performance → Cache stats → Top entities
+Total: 30 working days (~6 weeks)
 ```
 
 ---
 
-## 2. Tech Stack & Tooling
+## API Contracts & SSE Protocol Reference
+
+> The frontend consumes these backend APIs. Use mock data when the backend isn't available.
+
+### REST Endpoints
+
+| Method | Endpoint | Response | Used By |
+|--------|----------|----------|---------|
+| `POST` | `/api/v1/research` | SSE stream | SearchBar → useResearch |
+| `POST` | `/api/v1/research/{session_id}/followup` | SSE stream | FollowUpInput → useResearch |
+| `GET` | `/api/v1/sessions` | `{ sessions: Session[] }` | SessionSidebar |
+| `GET` | `/api/v1/sessions/{id}` | `SessionDetail` | Session page |
+| `DELETE` | `/api/v1/sessions/{id}` | `204` | SessionSidebar |
+| `PATCH` | `/api/v1/sessions/{id}` | `Session` | SessionSidebar (rename) |
+| `GET` | `/api/v1/knowledge/graph` | `GraphData { nodes, edges }` | KnowledgeGraph |
+| `GET` | `/api/v1/sessions/{id}/graph` | `GraphData { nodes, edges }` | KnowledgeGraph |
+| `GET` | `/api/v1/knowledge/search?q=...` | `{ results[] }` | Knowledge page |
+| `GET` | `/api/v1/analytics` | `AnalyticsData` | Dashboard |
+| `GET` | `/api/v1/sources` | `{ sources: SourceConfig[] }` | SearchBar |
+| `GET` | `/api/v1/sessions/{id}/export?format=markdown` | File download | ExportMenu |
+| `GET` | `/api/v1/knowledge/export?format=obsidian` | ZIP download | ExportMenu |
+| `POST` | `/api/v1/sessions/{id}/share` | `{ link, role }` | ShareDialog |
+| `GET` | `/api/v1/suggestions` | `Suggestion[]` | Dashboard |
+| `POST` | `/api/v1/suggestions/{id}/execute` | SSE stream | Suggestion card |
+| `GET` | `/api/v1/notifications` | `Notification[]` | NotificationBell |
+| `PATCH` | `/api/v1/notifications/{id}/read` | `204` | NotificationBell |
+| `POST` | `/api/v1/schedules` | `Schedule` | Schedules page |
+| `GET` | `/api/v1/schedules` | `Schedule[]` | Schedules page |
+| `PATCH` | `/api/v1/schedules/{id}` | `Schedule` | Schedules page |
+| `DELETE` | `/api/v1/schedules/{id}` | `204` | Schedules page |
+| `GET` | `/api/v1/sessions/{id}/turns/{turn_id}/trace` | `AgentTrace` | AgentTrace |
+
+### SSE Event Protocol
+
+The `/research` and `/followup` endpoints return Server-Sent Events:
+
+```
+event: status
+data: {"phase": "decomposing", "message": "Breaking query into sub-queries..."}
+
+event: source_complete
+data: {"source": "ddg", "results_count": 8, "latency_ms": 1200}
+
+event: source_error
+data: {"source": "reddit", "error": "Timeout", "circuit_breaker_open": false}
+
+event: token
+data: {"content": "Based on analysis of 24 sources...", "citations": []}
+
+event: token
+data: {"content": " Kafka excels at high-throughput [1][2]", "citations": [1, 2]}
+
+event: complete
+data: {"session_id": "sess_abc", "sources_used": 24, "latency_ms": 7800, "citations": [...]}
+
+event: error
+data: {"message": "Rate limit exceeded", "code": "RATE_LIMIT"}
+
+event: agent_thinking
+data: {"agent": "coordinator", "reasoning": "Complex comparison detected..."}
+
+event: agent_action
+data: {"agent": "academic", "action": "search", "sources": ["arxiv"], "queries": [...]}
+
+event: agent_action_complete
+data: {"agent": "academic", "action": "search", "results_count": 3, "duration_ms": 2100}
+
+event: agent_evaluation
+data: {"agent": "academic", "confidence": 0.62, "gaps": ["No data beyond 50K msgs/sec"]}
+```
+
+---
+
+## Tech Stack Reference
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | **Framework** | Next.js 14 (App Router) | SSR, file-based routing, RSC |
 | **Styling** | Tailwind CSS 3.4+ | Utility-first CSS |
-| **Component Library** | shadcn/ui | Accessible, composable primitives (Dialog, Sheet, Tabs, Badge, Button, etc.) |
+| **Components** | shadcn/ui | Accessible, composable primitives |
 | **Icons** | Lucide Icons (`lucide-react`) | Consistent icon set |
-| **Scaffolding** | v0.dev | Rapid UI prototyping, generate initial component shells |
-| **Markdown Rendering** | `react-markdown` + `remark-gfm` | Render streamed markdown |
-| **SSE Parsing** | `eventsource-parser` | Parse Server-Sent Events from fetch streams |
-| **Graph Visualization** | D3.js (`d3-force`) | Force-directed knowledge graph |
-| **Charts** | Recharts | Dashboard charts (line, bar, gauge) |
-| **Auth** | `@supabase/supabase-js` + `@supabase/auth-helpers-nextjs` | Supabase Auth integration |
-| **State** | React Context + `useReducer` (or Zustand if needed) | Client state management |
+| **Markdown** | `react-markdown` + `remark-gfm` | Render streamed markdown |
+| **SSE** | `eventsource-parser` | Parse Server-Sent Events |
+| **Graph** | D3.js (`d3-force`) | Force-directed knowledge graph |
+| **Charts** | Recharts | Dashboard charts |
+| **Auth** | `@supabase/supabase-js` + helpers | Supabase Auth integration |
+| **State** | React Context + `useReducer` | Client state management |
 | **Forms** | React Hook Form + Zod | Form validation |
-| **Date** | `date-fns` | Date formatting |
-| **HTTP Client** | Native `fetch` (SSE) + lightweight wrapper | API communication |
-
-### Initial Setup
-
-```bash
-npx create-next-app@latest frontend --typescript --tailwind --app --src-dir --eslint
-cd frontend
-npx shadcn@latest init     # Select "New York" style, Zinc color, CSS variables = yes
-npx shadcn@latest add button input badge card dialog sheet tabs scroll-area separator tooltip avatar dropdown-menu checkbox slider select command popover toggle
-npm install lucide-react react-markdown remark-gfm eventsource-parser d3 @types/d3 recharts @supabase/supabase-js @supabase/auth-helpers-nextjs date-fns zod react-hook-form @hookform/resolvers
-```
+| **Date** | `date-fns` | Date formatting and grouping |
+| **Testing** | Vitest + React Testing Library | Unit + integration tests |
+| **Hosting** | Vercel (free tier) | Production deployment |
 
 ---
 
-## 3. Project Structure
+## Project Structure
 
 ```
 frontend/
 ├── src/
-│   ├── app/                             # Next.js App Router
-│   │   ├── layout.tsx                   # Root layout (theme, sidebar shell, providers)
-│   │   ├── page.tsx                     # Home / research page (search + stream)
-│   │   ├── knowledge/
-│   │   │   └── page.tsx                 # Knowledge graph visualization
-│   │   ├── dashboard/
-│   │   │   └── page.tsx                 # Analytics dashboard
-│   │   ├── session/
-│   │   │   └── [id]/
-│   │   │       └── page.tsx             # Session detail (conversation history)
+│   ├── app/
+│   │   ├── layout.tsx                    # Root layout (theme, providers, AppShell)
+│   │   ├── page.tsx                      # Home / research page
+│   │   ├── knowledge/page.tsx            # Knowledge graph
+│   │   ├── dashboard/page.tsx            # Analytics dashboard
+│   │   ├── session/[id]/page.tsx         # Session detail
 │   │   ├── settings/
-│   │   │   ├── page.tsx                 # General settings
-│   │   │   └── schedules/
-│   │   │       └── page.tsx             # Scheduled research management
+│   │   │   ├── page.tsx                  # General settings
+│   │   │   └── schedules/page.tsx        # Scheduled research
 │   │   ├── auth/
-│   │   │   ├── login/page.tsx           # Login page
-│   │   │   ├── signup/page.tsx          # Signup page
-│   │   │   └── callback/route.ts        # Supabase auth callback
-│   │   └── globals.css                  # Tailwind + shadcn/ui theme overrides
+│   │   │   ├── login/page.tsx
+│   │   │   ├── signup/page.tsx
+│   │   │   └── callback/route.ts
+│   │   ├── globals.css
+│   │   └── middleware.ts                 # Protected route redirects
 │   │
 │   ├── components/
 │   │   ├── layout/
-│   │   │   ├── AppShell.tsx             # Main layout wrapper (sidebar + content)
-│   │   │   ├── Header.tsx               # Top bar (logo, notifications, user menu)
-│   │   │   ├── SessionSidebar.tsx       # Left sidebar: session history list
-│   │   │   └── MobileNav.tsx            # Mobile bottom nav / hamburger
-│   │   │
+│   │   │   ├── AppShell.tsx
+│   │   │   ├── Header.tsx
+│   │   │   ├── SessionSidebar.tsx
+│   │   │   └── MobileNav.tsx
 │   │   ├── research/
-│   │   │   ├── SearchBar.tsx            # Main query input + source toggles
-│   │   │   ├── SourceToggle.tsx         # Individual source toggle pill
-│   │   │   ├── SourceIndicator.tsx      # Real-time source status strip
-│   │   │   ├── ResearchStream.tsx       # Streaming markdown answer
-│   │   │   ├── CitationCard.tsx         # Single citation card
-│   │   │   ├── CitationSidebar.tsx      # Citations panel (list of CitationCards)
-│   │   │   ├── FollowUpInput.tsx        # Follow-up question input
-│   │   │   ├── PhaseIndicator.tsx       # "Decomposing..." / "Searching..." / "Synthesizing..."
-│   │   │   └── ResearchView.tsx         # Composed view: phases + stream + citations
-│   │   │
+│   │   │   ├── SearchBar.tsx
+│   │   │   ├── SourceToggle.tsx
+│   │   │   ├── SourceIndicator.tsx
+│   │   │   ├── ResearchStream.tsx
+│   │   │   ├── CitationCard.tsx
+│   │   │   ├── CitationSidebar.tsx
+│   │   │   ├── FollowUpInput.tsx
+│   │   │   ├── PhaseIndicator.tsx
+│   │   │   └── ResearchView.tsx
 │   │   ├── knowledge/
-│   │   │   ├── KnowledgeGraph.tsx       # D3.js force-directed graph
-│   │   │   ├── EntityDetail.tsx         # Entity detail panel (on node click)
-│   │   │   ├── GraphControls.tsx        # Filter controls (type, session, date)
-│   │   │   └── GraphLegend.tsx          # Color legend for entity types
-│   │   │
+│   │   │   ├── KnowledgeGraph.tsx
+│   │   │   ├── EntityDetail.tsx
+│   │   │   ├── GraphControls.tsx
+│   │   │   └── GraphLegend.tsx
 │   │   ├── agent/
-│   │   │   ├── AgentThinking.tsx        # Real-time agent reasoning steps
-│   │   │   └── AgentTrace.tsx           # Post-research agent trace timeline
-│   │   │
+│   │   │   ├── AgentThinking.tsx
+│   │   │   └── AgentTrace.tsx
 │   │   ├── dashboard/
-│   │   │   ├── ActivityChart.tsx         # Research activity over time (line chart)
-│   │   │   ├── SourcePerformance.tsx     # Source latency + success rate table
-│   │   │   ├── CacheStats.tsx            # Cache hit rate gauge
-│   │   │   ├── TopEntities.tsx           # Top entities bar chart
-│   │   │   └── KnowledgeStats.tsx        # Nodes/edges count cards
-│   │   │
+│   │   │   ├── ActivityChart.tsx
+│   │   │   ├── SourcePerformance.tsx
+│   │   │   ├── CacheStats.tsx
+│   │   │   ├── TopEntities.tsx
+│   │   │   └── KnowledgeStats.tsx
 │   │   ├── auth/
-│   │   │   ├── LoginForm.tsx             # Email/password + GitHub OAuth
+│   │   │   ├── LoginForm.tsx
 │   │   │   ├── SignupForm.tsx
-│   │   │   └── UserMenu.tsx              # Avatar dropdown (profile, settings, logout)
-│   │   │
+│   │   │   └── UserMenu.tsx
 │   │   ├── shared/
-│   │   │   ├── NotificationBell.tsx       # Header notification icon + dropdown
-│   │   │   ├── ShareDialog.tsx            # Session sharing modal
-│   │   │   ├── ExportMenu.tsx             # Export dropdown (Markdown, JSON, Obsidian)
-│   │   │   └── EmptyState.tsx             # Reusable empty state illustrations
-│   │   │
-│   │   └── ui/                            # shadcn/ui generated components (auto)
-│   │       ├── button.tsx
-│   │       ├── badge.tsx
-│   │       ├── card.tsx
-│   │       └── ... (all shadcn primitives)
+│   │   │   ├── NotificationBell.tsx
+│   │   │   ├── ShareDialog.tsx
+│   │   │   ├── ExportMenu.tsx
+│   │   │   └── EmptyState.tsx
+│   │   └── ui/                           # shadcn/ui generated
 │   │
 │   ├── hooks/
-│   │   ├── useSSE.ts                     # SSE connection + event parsing
-│   │   ├── useResearch.ts                # Research state machine (idle → searching → streaming → done)
-│   │   ├── useSession.ts                 # Session CRUD operations
-│   │   ├── useKnowledge.ts               # Knowledge graph data fetching
-│   │   ├── useAuth.ts                    # Supabase auth state
-│   │   └── useNotifications.ts           # Notification polling/state
+│   │   ├── useSSE.ts
+│   │   ├── useResearch.ts
+│   │   ├── useSession.ts
+│   │   ├── useKnowledge.ts
+│   │   ├── useAuth.ts
+│   │   └── useNotifications.ts
 │   │
 │   ├── lib/
-│   │   ├── api.ts                        # API client (base URL, headers, fetch wrappers)
-│   │   ├── supabase.ts                   # Supabase client init (browser + server)
-│   │   ├── constants.ts                  # Source configs, theme colors, routes
-│   │   └── utils.ts                      # Shared utilities (cn, formatDate, etc.)
+│   │   ├── api.ts
+│   │   ├── supabase.ts
+│   │   ├── constants.ts
+│   │   ├── utils.ts
+│   │   └── mock-sse.ts                   # Mock SSE for backend-less dev
 │   │
 │   └── types/
-│       ├── research.ts                   # ResearchRequest, Citation, SSEEvent types
-│       ├── session.ts                    # Session, Turn types
-│       ├── knowledge.ts                  # Entity, Relationship, GraphData types
-│       └── agent.ts                      # AgentEvent, AgentTrace types
+│       ├── research.ts
+│       ├── session.ts
+│       ├── knowledge.ts
+│       └── agent.ts
 │
 ├── public/
 │   ├── logo.svg
@@ -200,6 +1207,7 @@ frontend/
 ├── next.config.js
 ├── tailwind.config.ts
 ├── tsconfig.json
+├── vitest.config.ts
 ├── package.json
 ├── Dockerfile
 └── .env.local.example
@@ -207,1196 +1215,7 @@ frontend/
 
 ---
 
-## 4. Design System & UI Principles
-
-### Visual Identity
-
-| Property | Value |
-|----------|-------|
-| Primary color | Indigo (`indigo-600` / shadcn primary) |
-| Background | White (light), Zinc-950 (dark) |
-| Font | `Inter` (via `next/font/google`) |
-| Border radius | `0.5rem` (shadcn default) |
-| Spacing | 4px grid (Tailwind default) |
-| Max content width | `1280px` (`max-w-7xl`) |
-
-### Source Color Palette
-
-Used consistently across SourceToggle, SourceIndicator, CitationCard, and Graph nodes.
-
-| Source | Color | Lucide Icon |
-|--------|-------|-------------|
-| DuckDuckGo | `orange-500` | `Globe` |
-| Reddit | `red-500` | `MessageCircle` |
-| HackerNews | `amber-600` | `Flame` |
-| ArXiv | `blue-600` | `GraduationCap` |
-| Wikipedia | `slate-600` | `BookOpen` |
-
-### Entity Type Color Palette (Knowledge Graph)
-
-| Entity Type | Color | Lucide Icon |
-|-------------|-------|-------------|
-| technology | `blue-500` | `Cpu` |
-| concept | `purple-500` | `Lightbulb` |
-| organization | `green-500` | `Building2` |
-| person | `orange-500` | `User` |
-| pattern | `teal-500` | `Layers` |
-| algorithm | `red-500` | `Binary` |
-| protocol | `cyan-500` | `Network` |
-| library | `pink-500` | `Package` |
-| service | `emerald-500` | `Cloud` |
-
-### Dark Mode
-
-- All components must support dark mode via Tailwind `dark:` classes
-- shadcn/ui handles this natively when theme provider is configured
-- Use `next-themes` for toggle (install: `npm install next-themes`)
-- Default: system preference, user can override
-
-### Design Tenets
-
-1. **Streaming-first**: The answer streams token-by-token. Never show a loading spinner for the answer — show progressive content.
-2. **Source transparency**: Always show which sources are being searched and their status.
-3. **Citation integrity**: Every `[n]` in the answer must be a clickable link resolving to a real source.
-4. **Progressive disclosure**: Agent reasoning, advanced filters, and debug info should be behind toggles — clean by default, powerful on demand.
-5. **Mobile-ready**: Single-column layout on mobile, two-column on desktop. Session sidebar becomes a Sheet/drawer on mobile.
-
----
-
-## 5. Pages & Routing
-
-| Route | Page | Description |
-|-------|------|-------------|
-| `/` | Home / Research | Main research interface (SearchBar + ResearchView) |
-| `/session/[id]` | Session Detail | Full conversation for a past session with follow-up |
-| `/knowledge` | Knowledge Graph | Interactive D3 graph + entity detail + filters |
-| `/dashboard` | Analytics | Charts: activity, source perf, cache, top entities |
-| `/settings` | Settings | User preferences, API keys (if self-hosted) |
-| `/settings/schedules` | Scheduled Research | CRUD for daily/weekly research schedules |
-| `/auth/login` | Login | Email/password + GitHub OAuth |
-| `/auth/signup` | Sign Up | Registration form |
-| `/auth/callback` | Auth Callback | Supabase OAuth redirect handler (route handler) |
-
-### Layout Architecture
-
-```
-RootLayout (layout.tsx)
-├── ThemeProvider (next-themes)
-├── AuthProvider (Supabase context)
-├── AppShell
-│   ├── Header (logo, search shortcut, NotificationBell, UserMenu)
-│   ├── SessionSidebar (left, collapsible, sheet on mobile)
-│   └── Main Content Area
-│       └── {children} — page content
-```
-
----
-
-## 6. Component Specifications
-
-### 6.1 SearchBar
-
-**Location:** `components/research/SearchBar.tsx`
-**Scaffold with v0.dev:** *"A large centered search input with placeholder text, submit button on the right, and a row of toggleable source badges below"*
-
-**Behavior:**
-- Large input field, centered on page (when no active research), shifts to top when results are showing
-- Placeholder: `"What would you like to research?"`
-- Source toggles below the input: row of `SourceToggle` pills (all on by default)
-- Submit on `Enter` key or click the submit button (use Lucide `ArrowRight` or `Search` icon)
-- Disable input + button while streaming
-- Validate: min 3 chars, max 2000 chars (show character count near limit)
-- Optional depth selector: `quick | standard | deep` (use shadcn `Select`)
-
-**shadcn components used:** `Input`, `Button`, `Badge`, `Select`, `Tooltip`
-
-**Props:**
-```typescript
-interface SearchBarProps {
-  onSubmit: (query: string, sources: string[], depth: ResearchDepth) => void;
-  isStreaming: boolean;
-  defaultSources?: string[];
-}
-```
-
----
-
-### 6.2 SourceToggle
-
-**Location:** `components/research/SourceToggle.tsx`
-
-**Behavior:**
-- Pill-shaped toggle for a single source
-- Shows: source icon (Lucide) + source name
-- Active state: filled background with source color
-- Inactive state: outline with muted text
-- Click toggles on/off
-
-**shadcn components used:** `Toggle` or custom pill using `Badge` variant
-
-**Props:**
-```typescript
-interface SourceToggleProps {
-  source: SourceConfig;     // { name, displayName, icon, color }
-  isActive: boolean;
-  onToggle: (sourceName: string) => void;
-}
-```
-
----
-
-### 6.3 SourceIndicator
-
-**Location:** `components/research/SourceIndicator.tsx`
-
-**Behavior:**
-- Horizontal row of status pills, one per active source
-- States per source (driven by SSE events):
-  - `waiting` → Gray pill, no icon
-  - `searching` → Blue pill, animated spinner (Lucide `Loader2` with `animate-spin`)
-  - `done` → Green pill, Lucide `Check`, show result count + latency: `"✓ 8 results (1.2s)"`
-  - `error` → Red pill, Lucide `AlertCircle`, tooltip shows error message
-- Updates in real-time as `source_complete` SSE events arrive
-
-**shadcn components used:** `Badge`, `Tooltip`
-
-**Props:**
-```typescript
-interface SourceIndicatorProps {
-  sources: SourceStatus[];
-  // SourceStatus: { name, displayName, status, resultsCount?, latencyMs?, error? }
-}
-```
-
----
-
-### 6.4 PhaseIndicator
-
-**Location:** `components/research/PhaseIndicator.tsx`
-
-**Behavior:**
-- Shows current pipeline phase as a subtle text + icon above the stream
-- Phases (from SSE `status` events):
-  1. `"Decomposing query..."` — Lucide `BrainCircuit`
-  2. `"Searching N sources..."` — Lucide `Search`
-  3. `"Processing results..."` — Lucide `Cog`
-  4. `"Synthesizing answer..."` — Lucide `Sparkles`
-- Transition animation: fade out old phase, fade in new
-
-**shadcn components used:** None (custom, lightweight)
-
----
-
-### 6.5 ResearchStream
-
-**Location:** `components/research/ResearchStream.tsx`
-
-**Behavior:**
-- Renders streamed markdown tokens as they arrive from the SSE `token` events
-- Uses `react-markdown` + `remark-gfm` for rendering (supports tables, lists, bold, headers, code blocks)
-- **Citation rendering:** Citation markers like `[1]`, `[2]` in the text are rendered as:
-  - Clickable superscript badges
-  - On hover: tooltip showing source title + URL
-  - On click: scroll to corresponding CitationCard in the sidebar, or open URL in new tab
-- Typing cursor: blinking cursor at end of text while streaming
-- Auto-scroll to bottom as content grows (with "scroll to bottom" button if user scrolls up)
-- After streaming completes: remove typing cursor, finalize rendering
-
-**shadcn components used:** `Tooltip`, `Badge`
-
-**Markdown custom renderers:**
-```typescript
-const components = {
-  // Custom renderer for citation markers [1], [2], etc.
-  // Parse inline text for /\[(\d+)\]/ pattern
-  // Render as <CitationBadge id={n} /> superscript
-  p: ({ children }) => <p className="mb-4 leading-7">{parseCitations(children)}</p>,
-  h2: ({ children }) => <h2 className="text-xl font-semibold mt-6 mb-3">{children}</h2>,
-  // ... etc
-};
-```
-
-**Props:**
-```typescript
-interface ResearchStreamProps {
-  tokens: string;            // Accumulated token string
-  citations: Citation[];     // Full citation data (from `complete` event)
-  isStreaming: boolean;
-  onCitationClick: (citationId: number) => void;
-}
-```
-
----
-
-### 6.6 CitationCard
-
-**Location:** `components/research/CitationCard.tsx`
-
-**Behavior:**
-- Displays a single citation source
-- Shows: citation number badge, title, source name with source icon + color, URL (truncated, linked), relevance score bar
-- Click opens source URL in new tab
-- Grouped by source type in the sidebar
-- Highlight animation when scrolled to (from in-text citation click)
-
-**shadcn components used:** `Card`, `Badge`, `Tooltip`
-
-**Props:**
-```typescript
-interface CitationCardProps {
-  citation: Citation;
-  isHighlighted?: boolean;
-}
-
-interface Citation {
-  id: number;
-  title: string;
-  url: string;
-  source_name: string;       // "duckduckgo", "reddit", etc.
-  relevance_score: float;    // 0.0 to 1.0
-}
-```
-
----
-
-### 6.7 CitationSidebar
-
-**Location:** `components/research/CitationSidebar.tsx`
-
-**Behavior:**
-- Right sidebar panel (desktop) or bottom sheet (mobile) listing all citations
-- Grouped by source type, each group with source icon + count header
-- Sorted within each group by relevance score (descending)
-- Only appears after research completes or partial citations arrive
-- Scrollable with shadcn `ScrollArea`
-
-**shadcn components used:** `ScrollArea`, `Separator`, `Sheet` (mobile)
-
----
-
-### 6.8 FollowUpInput
-
-**Location:** `components/research/FollowUpInput.tsx`
-
-**Behavior:**
-- Appears below the completed answer
-- Compact input field with "Ask a follow-up..." placeholder
-- Submit sends to `POST /api/v1/research/{session_id}/followup`
-- New answer streams below the previous one (conversation thread)
-- Disabled while streaming
-
-**shadcn components used:** `Input`, `Button`
-
----
-
-### 6.9 SessionSidebar
-
-**Location:** `components/layout/SessionSidebar.tsx`
-
-**Behavior:**
-- Left sidebar listing past research sessions
-- Each item shows: title (auto-generated from first query), date, query count badge
-- Click loads session into the main content area
-- "New Research" button at top (Lucide `Plus`)
-- Grouped by date: "Today", "Yesterday", "This Week", "Older"
-- Search/filter field at top
-- Shows only for authenticated users
-- Collapsible on desktop, Sheet/drawer on mobile
-
-**Data source:** `GET /api/v1/sessions` (paginated)
-
-**shadcn components used:** `ScrollArea`, `Button`, `Input`, `Sheet` (mobile), `Badge`
-
----
-
-### 6.10 KnowledgeGraph
-
-**Location:** `components/knowledge/KnowledgeGraph.tsx`
-
-**Behavior:**
-- Force-directed graph using D3.js (`d3-force`)
-- **Nodes:** Entities, sized by `mention_count`, colored by entity type (see color palette)
-- **Edges:** Relationships, labeled with type, weighted by confidence
-- **Interactions:**
-  - Drag nodes to rearrange
-  - Zoom/pan with mouse wheel + drag
-  - Click node → open EntityDetail panel
-  - Hover node → highlight connected edges and nodes
-- **Performance:** Must render <1s for up to 200 entities. Use canvas rendering for >100 nodes.
-
-**Graph views (toggle):**
-1. Full graph — all entities and relationships
-2. Session graph — filtered to a specific session
-3. Entity neighborhood — selected entity + 1-2 hop connections
-
-**Data source:** `GET /api/v1/sessions/{id}/graph` or `GET /api/v1/knowledge/graph`
-
----
-
-### 6.11 EntityDetail
-
-**Location:** `components/knowledge/EntityDetail.tsx`
-
-**Behavior:**
-- Slide-in panel (shadcn `Sheet` or custom panel) on entity node click
-- Shows: entity name, type badge (colored), description
-- Stats: mention count, first seen date, last seen date
-- "Sessions" section: list of sessions where this entity appears (linked to `/session/[id]`)
-- "Related entities" section: directly connected entities (clickable, refocus graph)
-- "Research more" button → prefills search bar with entity name and navigates to `/`
-
-**shadcn components used:** `Sheet`, `Badge`, `Button`, `Separator`, `ScrollArea`
-
----
-
-### 6.12 GraphControls
-
-**Location:** `components/knowledge/GraphControls.tsx`
-
-**Behavior:**
-- Filter panel (left sidebar or top bar on the knowledge page)
-- Filters:
-  - **Entity type:** Checkboxes (technology, concept, organization, etc.)
-  - **Session:** Dropdown/select to show only entities from a specific session
-  - **Date range:** Date pickers for first_seen / last_seen
-  - **Min mentions:** Slider to hide rarely-mentioned entities
-- Filters apply reactively to the graph
-
-**shadcn components used:** `Checkbox`, `Select`, `Slider`, `Popover`, `Button`
-
----
-
-### 6.13 AgentThinking (Phase 4)
-
-**Location:** `components/agent/AgentThinking.tsx`
-
-**Behavior:**
-- Collapsible panel above the streaming answer (hidden by default, toggled via "Show reasoning")
-- Shows agent reasoning steps in real-time as SSE events arrive
-- Each step: icon + agent type badge + reasoning text + timestamp
-- Color-coded by agent:
-  - Coordinator → `slate`
-  - Academic → `blue`
-  - Practitioner → `amber`
-  - Fact-checker → `green`
-- Steps appear with subtle fade-in animation
-- Each step expandable to show full reasoning text
-
-**SSE events consumed:** `agent_thinking`, `agent_action`, `agent_action_complete`, `agent_evaluation`
-
-**Example rendering:**
-```
-🤔 Coordinator: Analyzing query complexity → Complex comparison detected
-📚 Academic Agent: Searching ArXiv for "Kafka throughput benchmarks"
-💬 Practitioner Agent: Searching Reddit for "Kafka vs RabbitMQ production"
-📚 Academic Agent: Found 3 papers (confidence: 62%)
-📚 Academic Agent: Refining — need higher throughput data
-✅ Fact Check: Verifying "Kafka handles 100K msgs/sec" → Confirmed by 2 sources
-📝 Synthesizing from 8 chunks across 3 agents...
-```
-
-**shadcn components used:** `Collapsible`, `Badge`, `ScrollArea`
-
----
-
-### 6.14 AgentTrace (Phase 4)
-
-**Location:** `components/agent/AgentTrace.tsx`
-
-**Behavior:**
-- Post-research detailed timeline of all agent iterations
-- Shows decision tree: which agents were dispatched and why
-- Each iteration: reasoning → action → result → confidence delta
-- Expandable details for each step
-- Links from trace steps to specific citations in the answer
-
-**Data source:** `GET /api/v1/sessions/{id}/turns/{turn_id}/trace`
-
-**shadcn components used:** `Card`, `Collapsible`, `Badge`, `Separator`
-
----
-
-### 6.15 Dashboard Components (Phase 3)
-
-**ActivityChart** — Line chart (Recharts `LineChart`) showing queries per week
-**SourcePerformance** — Table: source name, avg latency, success rate, circuit breaker status
-**CacheStats** — Gauge or progress ring showing cache hit rate
-**TopEntities** — Horizontal bar chart of top 10 entities by mention count
-**KnowledgeStats** — Stat cards: total nodes, total edges, growth trend
-
-**Data source:** `GET /api/v1/analytics`
-
----
-
-### 6.16 Shared Components
-
-**NotificationBell** — Header bell icon with unread count badge. Dropdown shows recent notifications (proactive research suggestions, knowledge updates). Mark-as-read on click.
-
-**ShareDialog** — Modal to share a session. Generates a link with role selection (viewer/editor). Copy link button.
-
-**ExportMenu** — Dropdown on session page: "Export as Markdown", "Export as JSON", "Export to Obsidian". Triggers file download.
-
----
-
-## 7. Custom Hooks
-
-### 7.1 `useSSE`
-
-**File:** `hooks/useSSE.ts`
-
-The core hook for all real-time streaming. Uses `fetch` with `ReadableStream` + `eventsource-parser`.
-
-```typescript
-interface UseSSEOptions {
-  url: string;
-  method: 'GET' | 'POST';
-  body?: object;
-  headers?: Record<string, string>;
-  onEvent: (event: SSEEvent) => void;
-  onError?: (error: Error) => void;
-  onComplete?: () => void;
-}
-
-interface SSEEvent {
-  event: string;     // "status", "source_complete", "token", "complete", "agent_thinking", etc.
-  data: any;         // Parsed JSON data
-}
-
-interface UseSSEReturn {
-  start: () => void;
-  abort: () => void;
-  isConnected: boolean;
-  error: Error | null;
-}
-```
-
-**Implementation notes:**
-- Use `fetch()` with `ReadableStream` reader (not `EventSource` — we need POST support)
-- Parse SSE format: `event: <type>\ndata: <json>\n\n`
-- Use `eventsource-parser` library's `createParser()` for reliable parsing
-- Handle reconnection on network errors (max 3 retries with backoff)
-- Support `AbortController` for cancellation
-
----
-
-### 7.2 `useResearch`
-
-**File:** `hooks/useResearch.ts`
-
-State machine for the research lifecycle.
-
-```typescript
-type ResearchPhase = 'idle' | 'decomposing' | 'searching' | 'processing' | 'synthesizing' | 'complete' | 'error';
-
-interface UseResearchReturn {
-  // State
-  phase: ResearchPhase;
-  tokens: string;                  // Accumulated answer text
-  citations: Citation[];
-  sourceStatuses: SourceStatus[];
-  sessionId: string | null;
-  agentEvents: AgentEvent[];       // Phase 4
-  error: Error | null;
-
-  // Actions
-  startResearch: (query: string, sources: string[], depth: ResearchDepth) => void;
-  startFollowUp: (sessionId: string, query: string) => void;
-  reset: () => void;
-}
-```
-
-**Implementation:**
-- Wraps `useSSE` internally
-- Maps SSE events to state updates:
-  - `status` event → update `phase`
-  - `source_complete` event → update `sourceStatuses` array
-  - `token` event → append to `tokens` string
-  - `complete` event → set `phase = 'complete'`, populate `citations` + `sessionId`
-  - `agent_*` events → append to `agentEvents` array
-
----
-
-### 7.3 `useSession`
-
-**File:** `hooks/useSession.ts`
-
-Session CRUD operations.
-
-```typescript
-interface UseSessionReturn {
-  sessions: Session[];
-  isLoading: boolean;
-  fetchSessions: () => Promise<void>;
-  getSession: (id: string) => Promise<SessionDetail>;
-  archiveSession: (id: string) => Promise<void>;
-  renameSession: (id: string, title: string) => Promise<void>;
-}
-```
-
----
-
-### 7.4 `useAuth`
-
-**File:** `hooks/useAuth.ts`
-
-Supabase auth wrapper.
-
-```typescript
-interface UseAuthReturn {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signInWithGitHub: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-```
-
----
-
-## 8. API Contracts & SSE Protocol
-
-### 8.1 Base Configuration
-
-```typescript
-// lib/api.ts
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getAuthToken(); // from Supabase session
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.json());
-  return res.json();
-}
-```
-
-### 8.2 REST Endpoints
-
-| Method | Endpoint | Request Body | Response | Used By |
-|--------|----------|-------------|----------|---------|
-| `POST` | `/api/v1/research` | `{ query, sources[], depth }` | SSE stream | SearchBar → useResearch |
-| `POST` | `/api/v1/research/{session_id}/followup` | `{ query }` | SSE stream | FollowUpInput → useResearch |
-| `GET` | `/api/v1/sessions` | — | `{ sessions: Session[] }` | SessionSidebar |
-| `GET` | `/api/v1/sessions/{id}` | — | `SessionDetail` (with turns) | Session page |
-| `DELETE` | `/api/v1/sessions/{id}` | — | `204` | SessionSidebar |
-| `PATCH` | `/api/v1/sessions/{id}` | `{ title }` | `Session` | SessionSidebar (rename) |
-| `GET` | `/api/v1/knowledge/search?q=...&limit=10` | — | `{ results: KnowledgeResult[] }` | Knowledge page |
-| `GET` | `/api/v1/knowledge/recall?q=...` | — | `RecallResult` | Knowledge page |
-| `GET` | `/api/v1/sessions/{id}/graph` | — | `GraphData { nodes, edges }` | KnowledgeGraph |
-| `GET` | `/api/v1/analytics` | — | `AnalyticsData` | Dashboard |
-| `GET` | `/api/v1/sources` | — | `{ sources: SourceConfig[] }` | SearchBar (source list) |
-| `GET` | `/api/v1/sessions/{id}/export?format=markdown` | — | File download | ExportMenu |
-| `GET` | `/api/v1/knowledge/export?format=obsidian` | — | ZIP file | ExportMenu |
-| `GET` | `/api/v1/suggestions` | — | `Suggestion[]` | Dashboard / Notifications |
-| `POST` | `/api/v1/suggestions/{id}/execute` | — | SSE stream | Suggestion card |
-| `GET` | `/api/v1/notifications` | — | `Notification[]` | NotificationBell |
-| `PATCH` | `/api/v1/notifications/{id}/read` | — | `204` | NotificationBell |
-| `POST` | `/api/v1/schedules` | `ScheduleInput` | `Schedule` | Schedules page |
-| `GET` | `/api/v1/schedules` | — | `Schedule[]` | Schedules page |
-| `PATCH` | `/api/v1/schedules/{id}` | `Partial<ScheduleInput>` | `Schedule` | Schedules page |
-| `DELETE` | `/api/v1/schedules/{id}` | — | `204` | Schedules page |
-| `GET` | `/api/v1/sessions/{id}/turns/{turn_id}/trace` | — | `AgentTrace` | AgentTrace component |
-
-### 8.3 SSE Event Protocol
-
-The research endpoints (`/research` and `/followup`) return Server-Sent Events streams.
-
-**Event types and their data shapes:**
-
-```typescript
-// Phase status updates
-type StatusEvent = {
-  event: 'status';
-  data: {
-    phase: 'decomposing' | 'searching' | 'processing' | 'synthesizing';
-    message: string;
-    sources_active?: number;
-  };
-};
-
-// Individual source completion
-type SourceCompleteEvent = {
-  event: 'source_complete';
-  data: {
-    source: string;           // "ddg", "reddit", "hackernews", "arxiv", "wikipedia"
-    results_count: number;
-    latency_ms: number;
-  };
-};
-
-// Source failure
-type SourceErrorEvent = {
-  event: 'source_error';
-  data: {
-    source: string;
-    error: string;
-    circuit_breaker_open: boolean;
-  };
-};
-
-// Streamed answer tokens
-type TokenEvent = {
-  event: 'token';
-  data: {
-    content: string;          // Token text chunk
-    citations?: number[];     // Citation IDs referenced in this chunk
-  };
-};
-
-// Research complete
-type CompleteEvent = {
-  event: 'complete';
-  data: {
-    session_id: string;
-    sources_used: number;
-    latency_ms: number;
-    citations: Citation[];
-  };
-};
-
-// Error event
-type ErrorEvent = {
-  event: 'error';
-  data: {
-    message: string;
-    code: string;
-  };
-};
-
-// --- Agent events (Phase 4) ---
-
-type AgentThinkingEvent = {
-  event: 'agent_thinking';
-  data: {
-    agent: string;            // "coordinator", "academic", "practitioner", "factcheck"
-    reasoning: string;
-  };
-};
-
-type AgentActionEvent = {
-  event: 'agent_action';
-  data: {
-    agent: string;
-    action: string;           // "search", "refine", "verify", "expand", "recall"
-    sources?: string[];
-    queries?: string[];
-  };
-};
-
-type AgentActionCompleteEvent = {
-  event: 'agent_action_complete';
-  data: {
-    agent: string;
-    action: string;
-    results_count: number;
-    duration_ms: number;
-  };
-};
-
-type AgentEvaluationEvent = {
-  event: 'agent_evaluation';
-  data: {
-    agent: string;
-    confidence: number;       // 0.0 to 1.0
-    gaps: string[];
-  };
-};
-```
-
----
-
-## 9. State Management
-
-Use a layered approach:
-
-| Layer | Tool | Scope |
-|-------|------|-------|
-| Server state | `fetch` + React cache / SWR pattern | API data: sessions, knowledge, analytics |
-| Research state | `useResearch` hook (useReducer) | SSE-driven research lifecycle |
-| Auth state | Supabase client + React context | User session |
-| UI state | Local component state (`useState`) | Modals, toggles, sidebar open/close |
-| Theme | `next-themes` | Light/dark mode |
-
-Avoid pulling in a heavy global store (Redux, etc.) unless complexity warrants it. Start with hooks + context. Evaluate Zustand if state sharing becomes painful after Phase 2.
-
----
-
-## 10. Authentication Flow
-
-### Architecture
-
-- **Supabase Auth** handles user management (email/password + GitHub OAuth)
-- Backend verifies JWT tokens from Supabase in every protected request
-- Frontend sends `Authorization: Bearer <token>` header
-
-### Flow
-
-```
-1. User clicks "Sign In" → /auth/login
-2. Email/Password → supabase.auth.signInWithPassword()
-   OR
-   GitHub → supabase.auth.signInWithOAuth({ provider: 'github' })
-3. Supabase returns session with access_token
-4. Token stored in cookie (via @supabase/auth-helpers-nextjs)
-5. All API calls include Bearer token in header
-6. Backend validates JWT, extracts user_id
-```
-
-### Anonymous Mode
-
-- The research engine works WITHOUT auth
-- Anonymous users get full research (SSE streaming, citations)
-- Sessions are stored only in browser `localStorage` (not persisted server-side)
-- "Save this session" or "View past research" prompts sign-in
-- Session sidebar shows only after authentication
-
-### Protected Routes
-
-| Route | Auth Required? |
-|-------|---------------|
-| `/` (research) | No (anonymous allowed) |
-| `/session/[id]` | Yes |
-| `/knowledge` | Yes |
-| `/dashboard` | Yes |
-| `/settings/*` | Yes |
-
-Use Next.js middleware (`middleware.ts`) to redirect unauthenticated users on protected routes.
-
----
-
-## 11. Phased Implementation Plan
-
-### Phase 1 — Core Research UI (Sprint 2, Days 8-14)
-
-> **Goal:** Users can type a query, see sources searching in real-time, and read a streamed cited answer.
-
-#### Step 1.1: Project Setup (Day 8, 0.5 day)
-- [ ] `npx create-next-app@latest` with TypeScript + Tailwind + App Router
-- [ ] Install and initialize shadcn/ui (New York style, Zinc, CSS variables)
-- [ ] Add all dependencies (see [Tech Stack section](#2-tech-stack--tooling))
-- [ ] Set up `next-themes` dark mode provider in root layout
-- [ ] Set up `Inter` font via `next/font/google`
-- [ ] Create `.env.local.example` with `NEXT_PUBLIC_API_URL`
-- [ ] Configure `globals.css` with shadcn theme tokens + any custom overrides
-- [ ] Set up `lib/api.ts` with base fetch wrapper
-- [ ] Set up `lib/constants.ts` with source configs (name, color, icon)
-- [ ] Set up `types/` directory with initial TypeScript interfaces
-
-**Acceptance criteria:** `npm run dev` shows a blank page with dark mode toggle working.
-
-#### Step 1.2: SearchBar + Source Toggles (Day 8-9, 1 day)
-- [ ] Build `SourceToggle` pill component
-- [ ] Build `SearchBar` component with input + source toggle row + submit
-- [ ] Scaffold landing state: centered SearchBar on the page (Perplexity-like)
-- [ ] Use v0.dev to scaffold the initial layout, then customize
-- [ ] Add query validation (min 3 chars) with error message
-- [ ] Wire up keyboard handler: Enter to submit
-
-**Acceptance criteria:** User can type a query, toggle sources, and "submit" (console.log at this point).
-
-#### Step 1.3: useSSE Hook (Day 9, 0.5 day)
-- [ ] Implement `useSSE` hook with fetch + ReadableStream + eventsource-parser
-- [ ] Handle event parsing, error recovery, abort
-- [ ] Write a simple test page that connects to a mock SSE endpoint
-
-**Acceptance criteria:** Hook correctly parses SSE events from the backend `/research` endpoint.
-
-#### Step 1.4: useResearch Hook + Research State (Day 9, 0.5 day)
-- [ ] Implement `useResearch` hook wrapping `useSSE`
-- [ ] State machine: idle → decomposing → searching → processing → synthesizing → complete → error
-- [ ] Map SSE events to state transitions
-
-**Acceptance criteria:** Submitting a query transitions through all phases and accumulates tokens.
-
-#### Step 1.5: SourceIndicator + PhaseIndicator (Day 9-10, 0.5 day)
-- [ ] Build `SourceIndicator` component (horizontal status pills)
-- [ ] Build `PhaseIndicator` component (subtle text + icon)
-- [ ] Wire to `useResearch` state
-
-**Acceptance criteria:** Source pills update live as SSE `source_complete` events arrive. Phase text transitions.
-
-#### Step 1.6: ResearchStream (Day 10, 1 day)
-- [ ] Build `ResearchStream` component with react-markdown rendering
-- [ ] Implement citation parsing: regex `/\[(\d+)\]/g` → clickable superscript badges
-- [ ] Add typing cursor animation while streaming
-- [ ] Add auto-scroll behavior with "scroll to bottom" button
-- [ ] Handle code blocks, tables, lists properly via remark-gfm
-
-**Acceptance criteria:** Markdown answer streams in real-time with formatted text and clickable `[n]` citations.
-
-#### Step 1.7: CitationCard + CitationSidebar (Day 10, 0.5 day)
-- [ ] Build `CitationCard` component
-- [ ] Build `CitationSidebar` wrapper (grouped by source)
-- [ ] Wire citation click from ResearchStream → highlight in sidebar
-
-**Acceptance criteria:** Citations display with source icon, title, URL. Clicking `[1]` in answer highlights citation #1 in sidebar.
-
-#### Step 1.8: ResearchView Composition + Page Layout (Day 11, 0.5 day)
-- [ ] Build `ResearchView` composing: PhaseIndicator + SourceIndicator + ResearchStream + CitationSidebar
-- [ ] Wire into `page.tsx`: SearchBar (top) + ResearchView (below, appears on submit)
-- [ ] Responsive: two-column on desktop (stream + citation sidebar), single-column on mobile (citations below)
-- [ ] Transition: SearchBar moves from centered to top when research starts
-
-**Acceptance criteria:** Full end-to-end flow works: type query → see phases → see sources → read streamed answer with citations.
-
-#### Step 1.9: Dark Mode + Polish (Day 11-12, 0.5 day)
-- [ ] Verify all components look correct in dark mode
-- [ ] Add empty states (no results, error state, etc.)
-- [ ] Add loading skeleton for initial page load
-- [ ] Test mobile responsiveness (375px - 768px breakpoints)
-
-#### Step 1.10: Docker Integration (Day 12, 0.5 day)
-- [ ] Create `Dockerfile` (multi-stage: Node 18-alpine build → runtime)
-- [ ] `npm ci` → `npm run build` → `npm start`
-- [ ] Integrate into project `docker-compose.yml` as `frontend` service
-- [ ] Environment variable: `NEXT_PUBLIC_API_URL` from Docker env
-
-**Acceptance criteria:** `docker compose up` starts frontend on port 3000, connects to backend on port 8000.
-
----
-
-### Phase 2 — Sessions, Auth, Follow-ups (Sprints 4-6, Weeks 4-6)
-
-> **Goal:** Authenticated users have persistent sessions, can ask follow-ups, and see their history.
-
-#### Step 2.1: Session Sidebar (Week 4, 2 days)
-- [ ] Build `SessionSidebar` component
-- [ ] Implement `useSession` hook (fetch sessions, CRUD)
-- [ ] Group sessions by date (Today, Yesterday, This Week, Older) using `date-fns`
-- [ ] New Research button
-- [ ] Session click → load into main content
-- [ ] Collapsible on desktop, Sheet/drawer on mobile
-- [ ] AppShell layout: sidebar + content
-
-#### Step 2.2: Session Detail Page (Week 4, 1 day)
-- [ ] Build `/session/[id]/page.tsx`
-- [ ] Display full conversation (all turns in order)
-- [ ] Each turn shows: query, streamed answer, citations
-- [ ] Session metadata: title, date, query count, sources used
-
-#### Step 2.3: Follow-Up Input (Week 4, 1 day)
-- [ ] Build `FollowUpInput` component
-- [ ] Wire to `POST /api/v1/research/{session_id}/followup`
-- [ ] Stream follow-up answer below previous answers (conversation thread UI)
-- [ ] Share session context across follow-ups
-
-#### Step 2.4: Authentication UI (Week 5, 2 days)
-- [ ] Set up Supabase client (`lib/supabase.ts`)
-- [ ] Build `LoginForm` (email/password + GitHub OAuth button)
-- [ ] Build `SignupForm`
-- [ ] Build `UserMenu` (avatar dropdown: profile, settings, logout)
-- [ ] Implement `useAuth` hook
-- [ ] Set up `/auth/callback/route.ts` for OAuth redirect
-- [ ] Add auth middleware for protected routes
-- [ ] Implement anonymous mode: research works without auth, "save" prompts sign-in
-
-#### Step 2.5: Header + Navigation (Week 5, 1 day)
-- [ ] Build `Header` component: logo, (optional: global search shortcut), UserMenu
-- [ ] Build `MobileNav`: responsive bottom nav or hamburger menu
-- [ ] Dark mode toggle in header
-
-#### Step 2.6: Source Indicator Updates (Week 5, 0.5 day)
-- [ ] Add Reddit and ArXiv to source configs (icons, colors)
-- [ ] Source list now driven by `GET /api/v1/sources` (dynamic, not hardcoded)
-
-#### Step 2.7: Vercel Deployment Prep (Week 6, 0.5 day)
-- [ ] Verify build passes: `npm run build`
-- [ ] Set `NEXT_PUBLIC_API_URL` env var for production
-- [ ] Test SSE streaming works over Vercel's edge network
-- [ ] Configure `next.config.js` for production (output: standalone if Docker, or default for Vercel)
-
-**Phase 2 Acceptance Criteria:**
-- [ ] Authenticated users see session history in sidebar
-- [ ] Click past session → view full conversation
-- [ ] Follow-up questions work within a session
-- [ ] Auth flow works (signup, login, GitHub OAuth, logout)
-- [ ] Anonymous users can research but can't save sessions
-- [ ] Deployed on Vercel
-
----
-
-### Phase 3 — Knowledge Graph, Dashboard, Export (Sprints 8-10, Weeks 8-10)
-
-> **Goal:** Interactive knowledge graph, analytics dashboard, export, sharing, scheduled research UI.
-
-#### Step 3.1: Knowledge Graph Page (Week 8, 3 days)
-- [ ] Build `/knowledge/page.tsx` layout: graph area + controls sidebar + entity detail panel
-- [ ] Implement `KnowledgeGraph` with D3.js force simulation
-  - Canvas rendering for performance
-  - Nodes: entities (circle, sized by mention_count, colored by type)
-  - Edges: relationships (line, labeled, weighted by confidence)
-  - Zoom, pan, drag interactions
-  - Click node → EntityDetail panel
-  - Hover node → highlight connections
-- [ ] Build `GraphControls` (entity type filters, session filter, date range, min mentions)
-- [ ] Build `GraphLegend` (entity type color key)
-- [ ] Implement `useKnowledge` hook
-
-#### Step 3.2: Entity Detail Panel (Week 8, 1 day)
-- [ ] Build `EntityDetail` as a Sheet panel
-- [ ] Display: name, type, description, mention count, first/last seen
-- [ ] Sessions list (linked to `/session/[id]`)
-- [ ] Related entities (clickable, refocuses graph)
-- [ ] "Research more" button → navigates to `/` with query prefilled
-
-#### Step 3.3: Export Functionality (Week 9, 1 day)
-- [ ] Build `ExportMenu` dropdown on session page
-- [ ] "Export as Markdown" → `GET /api/v1/sessions/{id}/export?format=markdown` → file download
-- [ ] "Export as JSON" → same endpoint with `format=json`
-- [ ] "Export to Obsidian" (knowledge-level) → `GET /api/v1/knowledge/export?format=obsidian` → ZIP download
-- [ ] Use `<a download>` or `URL.createObjectURL` for triggering downloads
-
-#### Step 3.4: Share Dialog (Week 9, 1 day)
-- [ ] Build `ShareDialog` modal (shadcn `Dialog`)
-- [ ] Role selector: Viewer / Editor
-- [ ] "Generate Link" → `POST /api/v1/sessions/{id}/share`
-- [ ] Copy link to clipboard button
-- [ ] Shared session indicator: avatar pills of collaborators on session page
-
-#### Step 3.5: Analytics Dashboard (Week 9-10, 2 days)
-- [ ] Build `/dashboard/page.tsx`
-- [ ] `ActivityChart`: Recharts `LineChart` — queries per week
-- [ ] `SourcePerformance`: Table — source, avg latency (bar), success rate, circuit breaker status badge
-- [ ] `CacheStats`: Recharts `RadialBarChart` or progress ring — cache hit rate percentage
-- [ ] `TopEntities`: Recharts `BarChart` (horizontal) — top 10 entities by mentions
-- [ ] `KnowledgeStats`: Stat cards (shadcn `Card`) — total nodes, edges, sessions
-- [ ] Data from `GET /api/v1/analytics`
-
-#### Step 3.6: Scheduled Research UI (Week 10, 1 day)
-- [ ] Build `/settings/schedules/page.tsx`
-- [ ] Form to create schedule: query template, topics (tag input), frequency (daily/weekly), source selection
-- [ ] List existing schedules with edit/pause/delete
-- [ ] Active/paused status toggle
-- [ ] Use React Hook Form + Zod for validation
-
-#### Step 3.7: Notification System (Week 10, 1 day)
-- [ ] Build `NotificationBell` in header
-- [ ] Unread count badge
-- [ ] Dropdown: list of notifications (proactive research, schedule completions)
-- [ ] Click notification → navigate to relevant session/suggestion
-- [ ] Mark as read on click
-- [ ] Poll `GET /api/v1/notifications` every 60 seconds (or WebSocket if available)
-
-**Phase 3 Acceptance Criteria:**
-- [ ] Knowledge graph renders <1s with up to 200 entities
-- [ ] Nodes are interactive (drag, click, hover)
-- [ ] Entity filters work
-- [ ] Dashboard shows meaningful analytics
-- [ ] Sessions are exportable (Markdown, JSON, Obsidian)
-- [ ] Share links work
-- [ ] Scheduled research is manageable from UI
-- [ ] Notifications appear in header bell
-
----
-
-### Phase 4 — Agent Reasoning UI (Sprint 13, Week 13)
-
-> **Goal:** Make agent reasoning visible and explorable — the "wow factor."
-
-#### Step 4.1: AgentThinking Component (3 days)
-- [ ] Build collapsible reasoning panel
-- [ ] Parse and display agent SSE events in real-time
-- [ ] Color-code by agent type
-- [ ] Animate step appearance (fade-in)
-- [ ] Expandable steps for full reasoning text
-- [ ] "Show agent reasoning" toggle button (off by default)
-
-#### Step 4.2: AgentTrace Component (2 days)
-- [ ] Build post-research trace timeline
-- [ ] Fetch from `GET /api/v1/sessions/{id}/turns/{turn_id}/trace`
-- [ ] Timeline visualization: each iteration as a node with expand
-- [ ] Show reasoning → action → result → confidence for each step
-- [ ] Link trace steps to citations in the answer
-
-#### Step 4.3: Proactive Suggestion Cards (1 day)
-- [ ] Suggestion cards on dashboard: knowledge gap, stale research, incomplete comparison
-- [ ] Each card: title, reasoning, suggested query, "Research Now" button
-- [ ] "Research Now" → `POST /api/v1/suggestions/{id}/execute` → opens research with streaming
-
-**Phase 4 Acceptance Criteria:**
-- [ ] Agent reasoning is visible in real-time via toggle
-- [ ] Post-research trace is explorable
-- [ ] Proactive suggestions are actionable with one click
-
----
-
-## 12. Docker & Deployment
-
-### Dockerfile
-
-```dockerfile
-# Multi-stage build
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:18-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-
-### docker-compose.yml (frontend service)
-
-```yaml
-frontend:
-  build: ./frontend
-  ports: ["3000:3000"]
-  environment:
-    - NEXT_PUBLIC_API_URL=http://backend:8000
-  depends_on:
-    backend:
-      condition: service_healthy
-```
-
-### Vercel Deployment
-
-- Connect GitHub repo → auto-deploy `frontend/` directory
-- Root directory: `frontend`
-- Build command: `npm run build`
-- Output directory: `.next`
-- Environment variable: `NEXT_PUBLIC_API_URL=https://sift-backend.onrender.com`
-- Framework preset: Next.js (auto-detected)
-
----
-
-## 13. Testing Strategy
-
-| Type | Tool | Scope |
-|------|------|-------|
-| Unit | Vitest + React Testing Library | Individual components, hooks |
-| Integration | Vitest + MSW (Mock Service Worker) | SSE streaming, API interactions |
-| E2E | Playwright | Full user flows (research, auth, knowledge graph) |
-| Visual | Storybook (optional) | Component catalog, visual regression |
-
-### Priority Tests
-
-| Test | Priority | Phase |
-|------|----------|-------|
-| SearchBar submit emits correct query + sources | P0 | 1 |
-| useSSE parses all event types correctly | P0 | 1 |
-| useResearch transitions through all phases | P0 | 1 |
-| ResearchStream renders streaming markdown | P0 | 1 |
-| Citation click highlights correct CitationCard | P1 | 1 |
-| SourceIndicator shows correct states | P1 | 1 |
-| Dark mode renders all components correctly | P1 | 1 |
-| Mobile layout: single column, sidebar as sheet | P1 | 1 |
-| Auth flow: login → token → protected route | P0 | 2 |
-| Session sidebar loads and filters sessions | P1 | 2 |
-| Follow-up streams below previous answer | P1 | 2 |
-| Knowledge graph renders 100 nodes in <1s | P0 | 3 |
-| Graph filters update visible nodes | P1 | 3 |
-| Export triggers file download | P2 | 3 |
-| Agent events render in AgentThinking panel | P1 | 4 |
-
-### CI (GitHub Actions)
-
-```yaml
-frontend:
-  steps:
-    - npm ci
-    - npm run lint
-    - npm run build          # Catch TypeScript errors
-    - npx vitest run         # Unit + integration tests
-```
-
----
-
-## 14. Performance Requirements
-
-| Metric | Target |
-|--------|--------|
-| First Contentful Paint (FCP) | < 1.5s |
-| Largest Contentful Paint (LCP) | < 2.5s |
-| Time to Interactive (TTI) | < 3.5s |
-| Token rendering lag | < 50ms after SSE event received |
-| Knowledge graph render (200 nodes) | < 1s |
-| Dashboard page load | < 2s |
-| Bundle size (initial JS) | < 200KB gzipped |
-
-### Optimization Strategies
-
-- Use Next.js App Router with Server Components where possible (layout, static pages)
-- Dynamic import D3.js (only on `/knowledge` page)
-- Dynamic import Recharts (only on `/dashboard` page)
-- Lazy-load CitationSidebar on mobile (Sheet, not always rendered)
-- Use `react-markdown` with minimal plugins
-- Virtualize long session lists (react-window) if >100 sessions
-- Image optimization: `next/image` for any static images
-
----
-
-## 15. Accessibility & Responsiveness
-
-### Accessibility (a11y)
-
-- shadcn/ui components are built on Radix UI primitives (WCAG 2.1 AA compliant)
-- All interactive elements must be keyboard navigable
-- Focus trapping in modals/dialogs
-- ARIA labels for:
-  - Source toggle states (`aria-pressed`)
-  - Phase indicator status (`aria-live="polite"`)
-  - Streaming text region (`aria-live="polite"`, `aria-atomic="false"`)
-  - Citation links (`aria-label="Source N: title"`)
-  - Graph nodes (`aria-label` with entity name + type)
-- Color contrast: 4.5:1 minimum for text (built into shadcn/ui Zinc theme)
-- Reduced motion: respect `prefers-reduced-motion` — disable graph animations, typing cursor animation
-
-### Responsive Breakpoints
-
-| Breakpoint | Layout |
-|------------|--------|
-| `< 640px` (mobile) | Single column. Sidebar as Sheet. Citations below answer. Simplified graph. |
-| `640px - 1024px` (tablet) | Single column with wider content. Sidebar collapsible. |
-| `> 1024px` (desktop) | Two-column: answer + citation sidebar. Persistent sidebar. Full graph. |
-
----
-
-## Appendix: Quick Reference — shadcn/ui Component Mapping
-
-| Sift Feature | shadcn/ui Components |
-|--------------|---------------------|
-| Search bar | `Input`, `Button` |
-| Source toggles | `Toggle` or `Badge` |
-| Source status pills | `Badge`, `Tooltip` |
-| Streaming answer | Custom (react-markdown) |
-| Citation cards | `Card`, `Badge` |
-| Citation sidebar | `ScrollArea`, `Sheet` (mobile) |
-| Session sidebar | `ScrollArea`, `Sheet` (mobile), `Button` |
-| Session list items | `Button` (variant ghost) |
-| Knowledge graph | D3.js (custom canvas) |
-| Entity detail | `Sheet`, `Badge`, `Separator` |
-| Graph controls | `Checkbox`, `Select`, `Slider`, `Popover` |
-| Dashboard stats | `Card` |
-| Dashboard charts | Recharts (custom) |
-| Auth forms | `Input`, `Button`, `Label` |
-| User menu | `DropdownMenu`, `Avatar` |
-| Notifications | `DropdownMenu`, `Badge` |
-| Share dialog | `Dialog`, `Select`, `Button` |
-| Export menu | `DropdownMenu` |
-| Agent reasoning | `Collapsible`, `Badge` |
-| Dark mode toggle | `Button` + Lucide `Sun`/`Moon` |
-| Settings forms | `Input`, `Select`, `Switch`, `Button` |
-| Toasts/alerts | `Sonner` or shadcn `Toast` |
-
----
-
-## Appendix: Environment Variables
+## Environment Variables
 
 ```bash
 # .env.local.example
@@ -1404,11 +1223,14 @@ frontend:
 # Required
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
-# Supabase (required for auth in Phase 2+)
+# Supabase Auth (required for auth features, Phase 2+)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+
+# Development
+NEXT_PUBLIC_USE_MOCK=true                  # Use mock SSE when backend unavailable
 ```
 
 ---
 
-*This document is the single source of truth for frontend implementation. Update it as API contracts evolve or new components are added.*
+*This roadmap is the single source of truth for frontend execution. Check off tasks as you complete them. Each checkpoint is a testable proof of progress. The backend is developed separately — use mock data until API endpoints are available.*
