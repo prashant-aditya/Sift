@@ -1699,7 +1699,7 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `core/orchestrator.py`, `api/routes/research.py` | **Duration:** Days 5-6
 
-- [ ] **CP-1.6.1** Implement `ResearchOrchestrator` with 7-step pipeline:
+- [x] **CP-1.6.1** Implement `ResearchOrchestrator` with 7-step pipeline:
   1. Analyze query → sub-queries → yield `status` event
   2. Fan-out searches via `asyncio.gather` → yield `source_complete` events
   3. Ingest results → yield `status` event
@@ -1707,10 +1707,10 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
   5. Retrieve top-15 via vector similarity
   6. Stream synthesis via LLM → yield `token` events
   7. Complete → yield `complete` event with `session_id` + citations
-- [ ] **CP-1.6.2** Implement SSE endpoint `POST /api/v1/research` using `EventSourceResponse`
-- [ ] **CP-1.6.3** Define request model `ResearchRequest` with `query`, `sources`, `depth` fields
-- [ ] **CP-1.6.4** Wrap each source search in try/except — log failures, continue with remaining sources
-- [ ] **CP-1.6.5** Write tests:
+- [x] **CP-1.6.2** Implement SSE endpoint `POST /api/v1/research` using `EventSourceResponse`
+- [x] **CP-1.6.3** Define request model `ResearchRequest` with `query`, `sources`, `depth` fields
+- [x] **CP-1.6.4** Wrap each source search in try/except — log failures, continue with remaining sources
+- [x] **CP-1.6.5** Write tests:
   - Full pipeline e2e with mocked sources and mocked LLM
   - Partial source failure (1 of 3 fails → still returns results)
   - Empty results handling
