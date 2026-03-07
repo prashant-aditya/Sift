@@ -15,7 +15,13 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" aria-label="Toggle theme" disabled>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Toggle theme"
+        disabled
+        className="touch-target"
+      >
         <Sun className="h-5 w-5" />
       </Button>
     );
@@ -29,11 +35,12 @@ export function ThemeToggle() {
       size="icon"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="touch-target"
     >
       {isDark ? (
-        <Sun className="h-5 w-5 transition-transform" />
+        <Sun className="h-5 w-5 transition-transform motion-reduce:transition-none" />
       ) : (
-        <Moon className="h-5 w-5 transition-transform" />
+        <Moon className="h-5 w-5 transition-transform motion-reduce:transition-none" />
       )}
     </Button>
   );
