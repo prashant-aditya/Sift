@@ -168,6 +168,8 @@ def mock_vector_store():
 
 @pytest.fixture()
 def mock_embedder():
+    # Still used by DenseRetriever under the hood, but orchestrator no longer
+    # calls embedder directly.
     embedder = MagicMock()
     embedder.embed = AsyncMock(return_value=[[0.1] * 384])
     return embedder
@@ -376,8 +378,9 @@ class TestResearchPipelineE2E:
         events = await _collect_events(orch.research("test", depth="quick"))
 
         assert mock_vector_store.query_session.called
+        # DenseRetriever fetches dense_top_k (=50) for hybrid fusion.
         call_args = mock_vector_store.query_session.call_args
-        assert call_args[0][2] == DEPTH_CONFIG["quick"]["retrieval_top_k"]
+        assert call_args[0][2] == 50
 
     @pytest.mark.asyncio
     async def test_depth_deep_uses_correct_config(
@@ -404,7 +407,7 @@ class TestResearchPipelineE2E:
         events = await _collect_events(orch.research("test", depth="deep"))
 
         call_args = mock_vector_store.query_session.call_args
-        assert call_args[0][2] == DEPTH_CONFIG["deep"]["retrieval_top_k"]
+        assert call_args[0][2] == 50
 
     @pytest.mark.asyncio
     async def test_specific_sources_filter(

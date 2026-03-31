@@ -19,6 +19,7 @@ from app.sources.duckduckgo import DuckDuckGoAdapter
 from app.sources.hackernews import HackerNewsAdapter
 from app.sources.registry import SourceRegistry
 from app.sources.wikipedia import WikipediaAdapter
+from workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.embedder = embedder
     app.state.ingestion_pipeline = IngestionPipeline(embedder=embedder)
     app.state.synthesizer = Synthesizer()
+    app.state.celery_app = celery_app
 
     logger.info(
         "Starting Sift backend — chroma_dir=%s, llm=%s, sources=%s",

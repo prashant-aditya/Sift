@@ -18,8 +18,11 @@ from app.core.query_analyzer import QueryAnalyzer
 from app.core.synthesizer import Synthesizer
 from app.db.vector_store import VectorStore
 from app.db.vector_store import RetrievedChunk
+from app.ingestion.chunker import Chunk
 from app.ingestion.embedder import EmbeddingGenerator
 from app.ingestion.pipeline import IngestionPipeline
+from app.retrieval.dense import DenseRetriever
+from app.retrieval.hybrid_retriever import HybridRetriever
 from app.sources.base import SourceAdapter, SourceResult
 from app.sources.registry import SourceRegistry
 
@@ -95,6 +98,8 @@ class ResearchOrchestrator:
         vector_store: VectorStore,
         embedder: EmbeddingGenerator,
         synthesizer: Synthesizer,
+        retriever: HybridRetriever | None = None,
+        celery_app: Any | None = None,
     ) -> None:
         self._query_analyzer = query_analyzer
         self._source_registry = source_registry
@@ -102,6 +107,10 @@ class ResearchOrchestrator:
         self._vector_store = vector_store
         self._embedder = embedder
         self._synthesizer = synthesizer
+        self._celery_app = celery_app
+        self._retriever = retriever or HybridRetriever(
+            dense=DenseRetriever(vector_store=vector_store, embedder=embedder)
+        )
 
     async def research(
         self,
@@ -152,17 +161,21 @@ class ResearchOrchestrator:
             "sub_queries_count": len(sub_queries),
         })
 
-        flat_results, source_errors = await self._fan_out_searches(
-            adapters, sub_queries, config["max_results_per_source"],
+        flat_results, source_errors, chunks, source_counts, sources_used = await self._fan_out_searches(
+            adapters,
+            sub_queries,
+            config["max_results_per_source"],
+            session_id=session_id,
         )
 
-        for source_name, count in _aggregate_source_counts(flat_results):
+        counts_iter = (source_counts or dict(_aggregate_source_counts(flat_results))).items()
+        for source_name, count in counts_iter:
             yield _sse_event("source_complete", {
                 "source": source_name,
                 "results_count": count,
             })
 
-        if not flat_results:
+        if (sources_used or len(flat_results)) == 0:
             yield _sse_event("complete", {
                 "session_id": session_id,
                 "sources_used": 0,
@@ -171,37 +184,44 @@ class ResearchOrchestrator:
             })
             return
 
-        # --- Step 3: Ingest results (extract → chunk → embed) ---
-        yield _sse_event("status", {
-            "phase": "processing",
-            "results_count": len(flat_results),
-        })
-        chunks = await self._ingestion_pipeline.process(flat_results)
-
-        if not chunks:
-            yield _sse_event("complete", {
-                "session_id": session_id,
-                "sources_used": len(flat_results),
-                "citations": [],
+        # --- Step 3-4: Ingest + store (done locally or via Celery chord callback) ---
+        if chunks is None:
+            yield _sse_event("status", {
+                "phase": "processing",
+                "results_count": sources_used or len(flat_results),
             })
-            return
+            chunks = await self._ingestion_pipeline.process(flat_results)
 
-        # --- Step 4: Store chunks in ChromaDB ---
-        yield _sse_event("status", {"phase": "storing", "chunks_count": len(chunks)})
-        collection_name = VectorStore.collection_name_for_session(session_id)
-        upserted = await asyncio.to_thread(
-            self._vector_store.upsert_chunks, collection_name, chunks,
-        )
-        logger.info("Stored %d chunks for session %s", upserted, session_id)
+            if not chunks:
+                yield _sse_event("complete", {
+                    "session_id": session_id,
+                    "sources_used": len(flat_results),
+                    "citations": [],
+                })
+                return
 
-        # --- Step 5: Retrieve top-K via vector similarity ---
+            yield _sse_event("status", {"phase": "storing", "chunks_count": len(chunks)})
+            collection_name = VectorStore.collection_name_for_session(session_id)
+            upserted = await asyncio.to_thread(
+                self._vector_store.upsert_chunks, collection_name, chunks,
+            )
+            logger.info("Stored %d chunks for session %s", upserted, session_id)
+        else:
+            # We can't stream worker-side progress; emit phases once to preserve
+            # the frontend's expected phase sequence.
+            yield _sse_event(
+                "status",
+                {"phase": "processing", "results_count": sources_used or len(flat_results)},
+            )
+            yield _sse_event("status", {"phase": "storing", "chunks_count": len(chunks)})
+
+        # --- Step 5: Retrieve top-K via hybrid retrieval (BM25 + dense) ---
         yield _sse_event("status", {"phase": "retrieving"})
-        query_embeddings = await self._embedder.embed([query])
-        relevant = await asyncio.to_thread(
-            self._vector_store.query_session,
-            session_id,
-            query_embeddings[0],
-            config["retrieval_top_k"],
+        relevant = await self._retriever.retrieve(
+            query=query,
+            session_id=session_id,
+            chunks=chunks,
+            top_k=config["retrieval_top_k"],
         )
 
         # --- Step 6: Stream synthesis via LLM ---
@@ -213,7 +233,7 @@ class ResearchOrchestrator:
         citations = _build_frontend_citations(relevant)
         complete_data: dict[str, Any] = {
             "session_id": session_id,
-            "sources_used": len(flat_results),
+            "sources_used": sources_used or len(flat_results),
             "citations": citations,
         }
         if source_errors:
@@ -248,29 +268,91 @@ class ResearchOrchestrator:
         adapters: list[SourceAdapter],
         sub_queries: list[str],
         max_results: int,
-    ) -> tuple[list[SourceResult], list[str]]:
-        """Search all adapter x sub-query combinations concurrently.
+        *,
+        session_id: str,
+    ) -> tuple[list[SourceResult], list[str], list[Chunk] | None, dict[str, int] | None, int | None]:
+        """Search all sources concurrently, optionally via Celery chord.
 
-        Returns a flat list of results and a list of error messages for any
-        searches that failed.
+        Returns:
+          - flat list of SourceResult
+          - list of error strings
+          - chunks (when Celery chord performs ingestion+upsert), else None
         """
+        if self._celery_app is not None:
+            return await self._fan_out_searches_celery(
+                adapters=adapters,
+                sub_queries=sub_queries,
+                max_results=max_results,
+                session_id=session_id,
+            )
+
         tasks = [
             self._safe_search(adapter, sub_query, max_results)
             for adapter in adapters
             for sub_query in sub_queries
         ]
-
         search_outcomes = await asyncio.gather(*tasks)
 
         flat_results: list[SourceResult] = []
         errors: list[str] = []
-
         for outcome in search_outcomes:
             flat_results.extend(outcome["results"])
             if outcome["error"]:
                 errors.append(f"{outcome['source']}: {outcome['error']}")
 
-        return flat_results, errors
+        source_counts = dict(_aggregate_source_counts(flat_results))
+        return flat_results, errors, None, source_counts, len(flat_results)
+
+    async def _fan_out_searches_celery(
+        self,
+        *,
+        adapters: list[SourceAdapter],
+        sub_queries: list[str],
+        max_results: int,
+        session_id: str,
+    ) -> tuple[list[SourceResult], list[str], list[Chunk] | None, dict[str, int] | None, int | None]:
+        """Dispatch source fan-out via Celery chord(group(...))(callback)."""
+        from celery import chord
+
+        # Use task names to avoid importing worker modules in the web process.
+        header = [
+            self._celery_app.signature(
+                "workers.tasks.search_source",
+                kwargs={
+                    "source_name": a.name,
+                    "sub_queries": sub_queries,
+                    "max_results": max_results,
+                },
+                queue="search",
+            )
+            for a in adapters
+        ]
+        callback = self._celery_app.signature(
+            "workers.callbacks.process_results",
+            kwargs={"session_id": session_id},
+            queue="ingestion",
+        )
+
+        async_result = chord(header)(callback)
+
+        def _wait():
+            # Worst-case includes header tasks + callback; keep a generous bound.
+            return async_result.get(timeout=90)
+
+        payload: dict[str, Any] = await asyncio.to_thread(_wait)
+
+        errors: list[str] = payload.get("errors") or []
+        source_counts = payload.get("source_counts") or {}
+        sources_used = int(payload.get("sources_used") or 0)
+        chunks_payload = payload.get("chunks") or []
+        chunks: list[Chunk] = []
+        for raw in chunks_payload:
+            try:
+                chunks.append(Chunk(**raw))
+            except Exception as exc:
+                errors.append(f"ingestion: invalid_chunk_payload ({exc})")
+
+        return [], errors, chunks, source_counts, sources_used
 
     @staticmethod
     async def _safe_search(

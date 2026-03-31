@@ -52,6 +52,7 @@ def _build_orchestrator(request: Request) -> ResearchOrchestrator:
         vector_store=state.vector_store,
         embedder=state.embedder,
         synthesizer=state.synthesizer,
+        celery_app=getattr(state, "celery_app", None),
     )
 
 

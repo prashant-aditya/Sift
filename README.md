@@ -1939,16 +1939,16 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `retrieval/bm25.py` | **Duration:** 2 days
 
-- [ ] **CP-2.1.1** Implement `BM25Index` class from scratch (no external dependency):
+- [x] **CP-2.1.1** Implement `BM25Index` class from scratch (no external dependency):
   - Parameters: `k1=1.5` (term frequency saturation), `b=0.75` (document length normalization)
   - IDF formula: `log((N - df + 0.5) / (df + 0.5) + 1)`
   - BM25 scoring: `Σ IDF(t) * (tf * (k1+1)) / (tf + k1*(1-b+b*dl/avgdl))`
-- [ ] **CP-2.1.2** Implement `fit()` — build inverted index: term → `list[(doc_idx, term_freq)]`, compute doc lengths + avg doc length
-- [ ] **CP-2.1.3** Implement `query()` — tokenize query, score each document, return `top_k` ranked results
-- [ ] **CP-2.1.4** Tokenizer: whitespace + lowercasing + stop word removal (hardcoded English list)
-- [ ] **CP-2.1.5** Implement `add_documents()` for incremental index updates without full refit
-- [ ] **CP-2.1.6** Index persistence: pickle the fitted index alongside ChromaDB data
-- [ ] **CP-2.1.7** Write tests: keyword match ranking, empty query, single-doc corpus, index save/load
+- [x] **CP-2.1.2** Implement `fit()` — build inverted index: term → `list[(doc_idx, term_freq)]`, compute doc lengths + avg doc length
+- [x] **CP-2.1.3** Implement `query()` — tokenize query, score each document, return `top_k` ranked results
+- [x] **CP-2.1.4** Tokenizer: whitespace + lowercasing + stop word removal (hardcoded English list)
+- [x] **CP-2.1.5** Implement `add_documents()` for incremental index updates without full refit
+- [x] **CP-2.1.6** Index persistence: pickle the fitted index alongside ChromaDB data
+- [x] **CP-2.1.7** Write tests: keyword match ranking, empty query, single-doc corpus, index save/load
 
 **Checkpoint Review:**
 - BM25 index builds over chunk corpus
@@ -1961,14 +1961,14 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `retrieval/hybrid_retriever.py`, `retrieval/dense.py` | **Duration:** 2 days
 
-- [ ] **CP-2.2.1** Extract dense retrieval into `DenseRetriever` class wrapping ChromaDB vector search
-- [ ] **CP-2.2.2** Implement `HybridRetriever` with RRF fusion:
+- [x] **CP-2.2.1** Extract dense retrieval into `DenseRetriever` class wrapping ChromaDB vector search
+- [x] **CP-2.2.2** Implement `HybridRetriever` with RRF fusion:
   - BM25 top-50 → Dense top-50 → `RRF(d) = Σ 1/(k + rank_i(d))` with k=60
   - Return fused top-15
-- [ ] **CP-2.2.3** Integrate `HybridRetriever` into orchestrator — replace direct ChromaDB query
-- [ ] **CP-2.2.4** Implement source diversity enforcement: max 3 chunks from same source in top-15
-- [ ] **CP-2.2.5** Write tests: RRF boosts docs in both rankings, non-overlapping sets, single list degradation, hybrid e2e
-- [ ] **CP-2.2.6** Benchmark on small golden dataset (10 queries with known relevant docs)
+- [x] **CP-2.2.3** Integrate `HybridRetriever` into orchestrator — replace direct ChromaDB query
+- [x] **CP-2.2.4** Implement source diversity enforcement: max 3 chunks from same source in top-15
+- [x] **CP-2.2.5** Write tests: RRF boosts docs in both rankings, non-overlapping sets, single list degradation, hybrid e2e
+- [x] **CP-2.2.6** Benchmark on small golden dataset (10 queries with known relevant docs)
 
 **Checkpoint Review:**
 - Hybrid retrieval produces better results than dense-only or sparse-only
@@ -1981,12 +1981,12 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `retrieval/deduplication.py` | **Duration:** 1 day
 
-- [ ] **CP-2.3.1** Implement `MinHashDeduplicator` using `datasketch`:
+- [x] **CP-2.3.1** Implement `MinHashDeduplicator` using `datasketch`:
   - 128 permutations, threshold 0.8 Jaccard similarity
   - Tokenize into 3-grams (shingles)
-- [ ] **CP-2.3.2** Authority-based duplicate selection: ArXiv > Wikipedia > HackerNews > Reddit > DuckDuckGo
-- [ ] **CP-2.3.3** Integrate into `IngestionPipeline`: deduplicate after extraction, before embedding
-- [ ] **CP-2.3.4** Write tests: identical docs detected, rephrased docs detected, different docs not flagged, authority selection
+- [x] **CP-2.3.2** Authority-based duplicate selection: ArXiv > Wikipedia > HackerNews > Reddit > DuckDuckGo
+- [x] **CP-2.3.3** Integrate into `IngestionPipeline`: deduplicate after extraction, before embedding
+- [x] **CP-2.3.4** Write tests: identical docs detected, rephrased docs detected, different docs not flagged, authority selection
 
 **Checkpoint Review:**
 - Deduplication runs in <100ms for 100 documents
@@ -2010,17 +2010,17 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `workers/celery_app.py`, `workers/tasks.py`, `workers/callbacks.py` | **Duration:** 2 days
 
-- [ ] **CP-2.4.1** Add dependencies: `celery[redis]`, `redis`
-- [ ] **CP-2.4.2** Configure Celery in `celery_app.py`:
+- [x] **CP-2.4.1** Add dependencies: `celery[redis]`, `redis`
+- [x] **CP-2.4.2** Configure Celery in `celery_app.py`:
   - JSON serialization, UTC timezone
   - Soft time limit: 15s, hard time limit: 20s
   - Late ack, prefetch multiplier 1
   - Task routes: `search_source` → `search` queue, `process_results` → `ingestion` queue
-- [ ] **CP-2.4.3** Implement `search_source` task: search a single source with all sub-queries, max 2 retries
-- [ ] **CP-2.4.4** Implement `process_results` chord callback: dedup → chunk → embed → ChromaDB upsert
-- [ ] **CP-2.4.5** Replace `asyncio.gather` in orchestrator with Celery `chord(group(...))(callback)`
-- [ ] **CP-2.4.6** Add `worker` + `redis` services to `docker-compose.yml`
-- [ ] **CP-2.4.7** Write tests in eager mode (`CELERY_ALWAYS_EAGER=True`): task execution, chord completion, retry, timeout
+- [x] **CP-2.4.3** Implement `search_source` task: search a single source with all sub-queries, max 2 retries
+- [x] **CP-2.4.4** Implement `process_results` chord callback: dedup → chunk → embed → ChromaDB upsert
+- [x] **CP-2.4.5** Replace `asyncio.gather` in orchestrator with Celery `chord(group(...))(callback)`
+- [x] **CP-2.4.6** Add `worker` + `redis` services to `docker-compose.yml`
+- [x] **CP-2.4.7** Write tests in eager mode (`CELERY_ALWAYS_EAGER=True`): task execution, chord completion, retry, timeout
 
 **Checkpoint Review:**
 - Source searches execute as Celery tasks on worker processes

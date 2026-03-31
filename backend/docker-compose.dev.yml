@@ -1,4 +1,11 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: sift-redis-dev
+    ports:
+      - "6379:6379"
+    restart: "no"
+
   backend:
     container_name: sift-backend-dev
     volumes:
@@ -19,3 +26,34 @@ services:
     restart: "no"
     environment:
       - CHROMA_PERSIST_DIR=/app/chroma_data
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  worker:
+    container_name: sift-worker-dev
+    volumes:
+      - .:/app
+      - chroma_data:/app/chroma_data
+    command:
+      [
+        "celery",
+        "-A",
+        "workers.celery_app.celery_app",
+        "worker",
+        "-Q",
+        "search,ingestion",
+        "--loglevel=info",
+      ]
+    restart: "no"
+    environment:
+      - CHROMA_PERSIST_DIR=/app/chroma_data
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+volumes:
+  chroma_data:
+    driver: local

@@ -4,7 +4,12 @@ import asyncio
 import logging
 from typing import Optional
 
-from ddgs import DDGS
+try:
+    from ddgs import DDGS  # type: ignore
+except Exception:  # pragma: no cover
+    # The dependency is optional in some environments (e.g. CI / minimal installs).
+    # Tests patch `app.sources.duckduckgo.DDGS`, so we must define the symbol.
+    DDGS = None  # type: ignore[assignment]
 
 from app.sources.base import SourceAdapter, SourceResult
 
@@ -45,6 +50,9 @@ class DuckDuckGoAdapter(SourceAdapter):
             return []
 
     def _sync_search(self, query: str, max_results: int) -> list[SourceResult]:
+        if DDGS is None:
+            raise RuntimeError("ddgs is not installed")
+
         raw = DDGS().text(query, max_results=max_results)
 
         results: list[SourceResult] = []
