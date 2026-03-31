@@ -18,31 +18,15 @@ from google import genai
 from google.genai import types
 
 from app.config import get_settings
+from app.core.prompts import (
+    NO_SOURCES_RESPONSE,
+    SYNTHESIS_SOURCE_HEADER_TEMPLATE,
+    SYNTHESIS_SYSTEM_PROMPT,
+    SYNTHESIS_USER_MESSAGE_TEMPLATE,
+)
 from app.db.vector_store import RetrievedChunk
 
 logger = logging.getLogger(__name__)
-
-SYNTHESIS_SYSTEM_PROMPT = """\
-You are a research synthesis engine.  Your task is to produce a comprehensive,
-well-structured answer to the user's query using ONLY the provided source
-chunks.
-
-Rules:
-- Cite sources using their numeric IDs in square brackets: [1], [2], etc.
-- You may ONLY reference source IDs listed under "Sources" below.
-  Do NOT invent or fabricate any citation.
-- Do NOT generate URLs or links — the frontend resolves citation IDs to URLs.
-- If sources contain contradicting information, acknowledge the contradiction
-  and analyze the conditions under which each claim holds.
-- Structure your answer with clear sections when the topic warrants it.
-- If no relevant source chunks are provided, state clearly that insufficient
-  information is available to answer the query.
-- Be concise but thorough.  Prioritise accuracy over length."""
-
-NO_SOURCES_RESPONSE = (
-    "I don't have enough information from the retrieved sources to answer "
-    "this query.  Try broadening your search or enabling additional sources."
-)
 
 DEFAULT_TEMPERATURE = 0.3
 DEFAULT_MAX_TOKENS = 2048
@@ -220,9 +204,13 @@ def _build_user_message(query: str, chunks: list[RetrievedChunk]) -> str:
     """Format the user prompt with numbered source blocks."""
     source_blocks: list[str] = []
     for idx, rc in enumerate(chunks, start=1):
-        header = f"[{idx}] (source: {rc.chunk.source_name} — {rc.chunk.source_title})"
+        header = SYNTHESIS_SOURCE_HEADER_TEMPLATE.format(
+            idx=idx,
+            source_name=rc.chunk.source_name,
+            source_title=rc.chunk.source_title,
+        )
         source_blocks.append(f"{header}\n{rc.chunk.text}")
 
     sources_text = "\n\n".join(source_blocks)
 
-    return f"Sources:\n{sources_text}\n\nQuery: {query}"
+    return SYNTHESIS_USER_MESSAGE_TEMPLATE.format(sources_text=sources_text, query=query)

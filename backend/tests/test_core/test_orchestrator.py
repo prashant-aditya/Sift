@@ -683,10 +683,11 @@ class TestSSEEventFormat:
 
         complete = next(e for e in events if e["event"] == "complete")
         for citation in complete["data"]["citations"]:
-            assert "citation_id" in citation
-            assert "source_url" in citation
+            assert "id" in citation
+            assert "url" in citation
             assert "source_name" in citation
-            assert "source_title" in citation
+            assert "title" in citation
+            assert "relevance_score" in citation
 
     @pytest.mark.asyncio
     async def test_session_id_consistent_across_events(self, orchestrator):

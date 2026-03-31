@@ -17,26 +17,9 @@ from google import genai
 from google.genai import types
 
 from app.config import get_settings
+from app.core.prompts import DECOMPOSITION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
-
-DECOMPOSITION_SYSTEM_PROMPT = """\
-You are a research query decomposition engine.
-
-Analyze the user's research query and decide whether it is:
-1. **Simple** — a single, focused question that can be answered with one search.
-2. **Complex** — a broad or multi-faceted question that benefits from being
-   split into 2-4 independent, focused sub-queries.
-
-Rules:
-- If simple, return a JSON array containing only the original query.
-- If complex, return a JSON array of 2-4 focused sub-queries.
-- Each sub-query must be self-contained and independently searchable.
-- Cover different facets of the original question (e.g. definitions,
-  comparisons, trade-offs, practical use-cases).
-- Do NOT repeat the same question in different wording.
-- Return ONLY a valid JSON array of strings.  No explanation, no markdown
-  fences, no extra text."""
 
 DEFAULT_TEMPERATURE = 0.1
 MAX_SUB_QUERIES = 4

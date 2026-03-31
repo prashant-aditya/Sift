@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 from app.sources.base import SourceAdapter, SourceResult
 

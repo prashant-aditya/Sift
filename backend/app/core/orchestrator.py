@@ -15,8 +15,9 @@ from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
 from app.core.query_analyzer import QueryAnalyzer
-from app.core.synthesizer import Synthesizer, build_citation_map
+from app.core.synthesizer import Synthesizer
 from app.db.vector_store import VectorStore
+from app.db.vector_store import RetrievedChunk
 from app.ingestion.embedder import EmbeddingGenerator
 from app.ingestion.pipeline import IngestionPipeline
 from app.sources.base import SourceAdapter, SourceResult
@@ -34,6 +35,37 @@ DEPTH_CONFIG: dict[str, dict[str, int]] = {
 def _sse_event(event: str, data: dict[str, Any]) -> dict[str, str]:
     """Build an SSE-compatible dict for sse-starlette's ``EventSourceResponse``."""
     return {"event": event, "data": json.dumps(data)}
+
+
+def _build_frontend_citations(relevant: list[RetrievedChunk]) -> list[dict[str, Any]]:
+    """Normalize retrieved chunks into the citation shape expected by the frontend.
+
+    Frontend `Citation` shape (matches mock data):
+      - id: number
+      - title: string
+      - url: string
+      - source_name: string
+      - relevance_score: number
+
+    We intentionally emit `url` (not `source_url`) to prevent client-side
+    `undefined.slice(...)` crashes.
+    """
+    citations: list[dict[str, Any]] = []
+    for idx, rc in enumerate(relevant, start=1):
+        url = rc.chunk.source_url or ""
+        title = rc.chunk.source_title or url or "Untitled source"
+        source_name = rc.chunk.source_name or "unknown"
+
+        citations.append(
+            {
+                "id": idx,
+                "title": title,
+                "url": url,
+                "source_name": source_name,
+                "relevance_score": float(rc.score),
+            }
+        )
+    return citations
 
 
 class ResearchOrchestrator:
@@ -178,11 +210,11 @@ class ResearchOrchestrator:
             yield _sse_event("token", {"content": token})
 
         # --- Step 7: Complete ---
-        citations = build_citation_map(relevant)
+        citations = _build_frontend_citations(relevant)
         complete_data: dict[str, Any] = {
             "session_id": session_id,
             "sources_used": len(flat_results),
-            "citations": [c.model_dump() for c in citations],
+            "citations": citations,
         }
         if source_errors:
             complete_data["errors"] = source_errors

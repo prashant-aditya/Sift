@@ -8,11 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.health import router as health_router
 from app.api.routes.research import router as research_router
 from app.config import get_settings
+from app.core.logging_config import setup_logging
 from app.core.query_analyzer import QueryAnalyzer
 from app.core.synthesizer import Synthesizer
 from app.db.vector_store import VectorStore
 from app.ingestion.embedder import EmbeddingGenerator
 from app.ingestion.pipeline import IngestionPipeline
+from app.middleware.request_context import RequestContextMiddleware
 from app.sources.duckduckgo import DuckDuckGoAdapter
 from app.sources.hackernews import HackerNewsAdapter
 from app.sources.registry import SourceRegistry
@@ -58,6 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    setup_logging()
 
     app = FastAPI(
         title="Sift Research Engine",
@@ -66,6 +69,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:3000"],

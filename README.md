@@ -32,6 +32,119 @@ This document is the single source of truth for the backend team. It contains ev
 
 ---
 
+## Quick Setup (5 Minutes)
+
+> For a detailed walkthrough, see [QUICKSTART.md](QUICKSTART.md). For demo queries, see [demo_queries.md](demo_queries.md).
+
+```bash
+# 1. Clone and enter the backend directory
+git clone https://github.com/your-org/sift.git
+cd sift/backend
+
+# 2. Configure your API key
+cp .env.example .env
+# Edit .env — set LLM_PROVIDER and the corresponding API key
+
+# 3. Start the backend
+docker compose up --build -d
+
+# 4. Verify
+curl http://localhost:8000/api/v1/health
+# → {"status": "ok", "version": "0.1.0"}
+```
+
+### Working API Examples (Phase 1)
+
+**Health Check:**
+
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+```json
+{"status": "ok", "version": "0.1.0"}
+```
+
+**Research Query (SSE Stream):**
+
+```bash
+curl -N -X POST http://localhost:8000/api/v1/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What are the trade-offs between Kafka and RabbitMQ for event-driven microservices?",
+    "depth": "standard"
+  }'
+```
+
+Request body fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | string (3-2000 chars) | Yes | The research question |
+| `sources` | string array or null | No | Source adapter names (`"duckduckgo"`, `"wikipedia"`, `"hackernews"`). Null uses all. |
+| `depth` | `"quick"` \| `"standard"` \| `"deep"` | No | Controls results per source and retrieval depth. Default: `"standard"`. |
+
+**SSE Response Stream:**
+
+```
+event: status
+data: {"phase": "decomposing", "session_id": "session_a1b2c3d4e5f6"}
+
+event: status
+data: {"phase": "decomposed", "sub_queries": ["Kafka ordering and throughput characteristics", "RabbitMQ message routing and reliability features", "Kafka vs RabbitMQ operational complexity comparison"]}
+
+event: status
+data: {"phase": "searching", "sources_active": 3, "sub_queries_count": 3}
+
+event: source_complete
+data: {"source": "duckduckgo", "results_count": 5}
+
+event: source_complete
+data: {"source": "wikipedia", "results_count": 5}
+
+event: source_complete
+data: {"source": "hackernews", "results_count": 5}
+
+event: status
+data: {"phase": "processing", "results_count": 15}
+
+event: status
+data: {"phase": "storing", "chunks_count": 42}
+
+event: status
+data: {"phase": "retrieving"}
+
+event: status
+data: {"phase": "synthesizing"}
+
+event: token
+data: {"content": "## Overview\n\n"}
+
+event: token
+data: {"content": "Kafka and RabbitMQ represent two fundamentally different approaches..."}
+
+event: complete
+data: {"session_id": "session_a1b2c3d4e5f6", "sources_used": 15, "citations": [{"id": 1, "title": "Apache Kafka - Wikipedia", "url": "https://en.wikipedia.org/wiki/Apache_Kafka", "source_name": "wikipedia", "relevance_score": 0.92}, {"id": 2, "title": "Kafka vs RabbitMQ", "url": "https://...", "source_name": "duckduckgo", "relevance_score": 0.88}]}
+```
+
+**Search specific sources only:**
+
+```bash
+curl -N -X POST http://localhost:8000/api/v1/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Latest developments in WebAssembly outside the browser",
+    "sources": ["duckduckgo", "hackernews"],
+    "depth": "deep"
+  }'
+```
+
+**Interactive API Docs:**
+
+Once running, visit **http://localhost:8000/docs** for the auto-generated Swagger UI where you can test all endpoints interactively.
+
+---
+
 ## 1. System Overview
 
 Sift is a self-hostable AI research engine that:
@@ -1741,10 +1854,10 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `docker-compose.yml`, `docker-compose.dev.yml`, `Makefile` | **Duration:** Day 8
 
-- [ ] **CP-1.7.1** Create production `docker-compose.yml`:
+- [x] **CP-1.7.1** Create production `docker-compose.yml`:
   - `backend` service with health check, env vars, chroma volume
-- [ ] **CP-1.7.2** Create `docker-compose.dev.yml` with volume mounts for hot reload (`uvicorn --reload`)
-- [ ] **CP-1.7.3** Create `Makefile` with targets: `dev`, `prod`, `test`, `test-coverage`, `lint`, `logs`, `down`, `clean`
+- [x] **CP-1.7.2** Create `docker-compose.dev.yml` with volume mounts for hot reload (`uvicorn --reload`)
+- [x] **CP-1.7.3** Create `Makefile` with targets: `dev`, `prod`, `test`, `test-coverage`, `lint`, `logs`, `down`, `clean`
 
 **Checkpoint Review:**
 - `make dev` starts full stack with hot reload
@@ -1757,22 +1870,22 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Entire team | **Files:** `tests/**` | **Duration:** Days 9-12
 
-- [ ] **CP-1.8.1** Create `conftest.py` with shared fixtures:
+- [x] **CP-1.8.1** Create `conftest.py` with shared fixtures:
   - `mock_groq_client`, `sample_source_results`, `temp_chroma_dir`, `vector_store`
-- [ ] **CP-1.8.2** Source adapter tests (5 per adapter — 15 total):
+- [x] **CP-1.8.2** Source adapter tests (5 per adapter — 15 total):
   valid response, empty results, timeout, rate limit, malformed response
-- [ ] **CP-1.8.3** Ingestion tests (18+):
+- [x] **CP-1.8.3** Ingestion tests (18+):
   chunker sizes/overlaps, metadata preservation, HTML extraction, embedding batching, full pipeline
-- [ ] **CP-1.8.4** Vector store tests (5+):
+- [x] **CP-1.8.4** Vector store tests (5+):
   upsert, query, metadata filter, empty collection, persistence
-- [ ] **CP-1.8.5** Core tests (13+):
+- [x] **CP-1.8.5** Core tests (13+):
   - Query analyzer: decomposition, passthrough, malformed LLM response, empty query
   - Synthesizer: streaming, citation format, empty chunks, max token handling
   - Orchestrator: full pipeline, partial failure, all fail, timeout, SSE format
-- [ ] **CP-1.8.6** API endpoint tests (4+):
+- [x] **CP-1.8.6** API endpoint tests (4+):
   valid request, invalid request, SSE format, concurrent requests
-- [ ] **CP-1.8.7** Configure `pytest.ini` with `asyncio_mode = auto`, markers for `slow` and `integration`
-- [ ] **CP-1.8.8** Achieve **70%+ overall coverage**, **90%+ on critical paths** (orchestrator, retrieval, synthesis)
+- [x] **CP-1.8.7** Configure `pytest.ini` with `asyncio_mode = auto`, markers for `slow` and `integration`
+- [x] **CP-1.8.8** Achieve **70%+ overall coverage**, **90%+ on critical paths** (orchestrator, retrieval, synthesis)
 
 **Checkpoint Review:**
 - `pytest` passes with 0 failures
@@ -1785,10 +1898,10 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Duration:** Days 13-14
 
-- [ ] **CP-1.9.1** Write `QUICKSTART.md` with 5-minute setup guide
-- [ ] **CP-1.9.2** Create `demo_queries.md` with 10 demo queries that showcase multi-source synthesis
-- [ ] **CP-1.9.3** Verify Docker setup works from a clean clone on a fresh machine
-- [ ] **CP-1.9.4** Update README with actual API examples and setup instructions
+- [x] **CP-1.9.1** Write `QUICKSTART.md` with 5-minute setup guide
+- [x] **CP-1.9.2** Create `demo_queries.md` with 10 demo queries that showcase multi-source synthesis
+- [x] **CP-1.9.3** Verify Docker setup works from a clean clone on a fresh machine
+- [x] **CP-1.9.4** Update README with actual API examples and setup instructions
 
 **Checkpoint Review:**
 - New developer can clone repo and have it running in under 5 minutes
@@ -1800,12 +1913,12 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 | # | Criteria | Status |
 |---|----------|--------|
-| 1 | All 9 goals completed and merged to `main` | [ ] |
-| 2 | 70%+ test coverage (90%+ on critical paths) | [ ] |
-| 3 | Docker Compose starts cleanly from fresh clone | [ ] |
-| 4 | 10 demo queries produce quality cited answers | [ ] |
-| 5 | No critical bugs in the happy path | [ ] |
-| 6 | SSE stream format verified (status → source_complete → token → complete) | [ ] |
+| 1 | All 9 goals completed and merged to `main` | [x] |
+| 2 | 70%+ test coverage (90%+ on critical paths) | [x] |
+| 3 | Docker Compose starts cleanly from fresh clone | [x] |
+| 4 | 10 demo queries produce quality cited answers | [x] |
+| 5 | No critical bugs in the happy path | [x] |
+| 6 | SSE stream format verified (status → source_complete → token → complete) | [x] |
 
 **Phase 1 Deliverable:** Enter a question → get a cited, multi-source answer streamed in real-time. Dockerized, tested, documented.
 

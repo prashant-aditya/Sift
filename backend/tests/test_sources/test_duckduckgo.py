@@ -7,8 +7,6 @@ import pytest
 
 from app.sources.duckduckgo import DuckDuckGoAdapter
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def adapter() -> DuckDuckGoAdapter:
