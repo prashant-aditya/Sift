@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Optional
 
 import httpx
 import numpy as np
@@ -43,7 +44,7 @@ class EmbeddingGenerator:
         self._hf_api_token = hf_api_token
         self._model_name = model_name
         self._api_url = _HF_FEATURE_EXTRACTION_URL.format(model=model_name)
-        self._local_model: object | None = None  # lazy-loaded SentenceTransformer
+        self._local_model: Optional[object] = None  # lazy-loaded SentenceTransformer
 
     # ------------------------------------------------------------------
     # Public API

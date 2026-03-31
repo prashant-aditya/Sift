@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from app.ingestion.chunker import Chunk, TextChunker
 from app.ingestion.embedder import EmbeddingGenerator
@@ -26,9 +27,9 @@ class IngestionPipeline:
 
     def __init__(
         self,
-        extractor: ContentExtractor | None = None,
-        chunker: TextChunker | None = None,
-        embedder: EmbeddingGenerator | None = None,
+        extractor: Optional[ContentExtractor] = None,
+        chunker: Optional[TextChunker] = None,
+        embedder: Optional[EmbeddingGenerator] = None,
     ) -> None:
         self._extractor = extractor or ContentExtractor()
         self._chunker = chunker or TextChunker()

@@ -7,7 +7,7 @@ LLM synthesis.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -22,7 +22,7 @@ class ResearchRequest(BaseModel):
     """Validated request body for the research endpoint."""
 
     query: str = Field(..., min_length=3, max_length=2000)
-    sources: list[str] | None = Field(
+    sources: Optional[list[str]] = Field(
         default=None,
         description="Source adapter names to search. None uses all available.",
     )

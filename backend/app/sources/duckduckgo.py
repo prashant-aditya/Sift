@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Optional
 
 from duckduckgo_search import DDGS
 
@@ -28,7 +29,7 @@ class DuckDuckGoAdapter(SourceAdapter):
         return True
 
     async def search(
-        self, query: str, max_results: int | None = None
+        self, query: str, max_results: Optional[int] = None
     ) -> list[SourceResult]:
         limit = max_results or self.max_results
         try:

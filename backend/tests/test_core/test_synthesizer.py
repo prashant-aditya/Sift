@@ -1,4 +1,4 @@
-"""Tests for app.core.synthesizer — cited answer generation via Groq."""
+"""Tests for app.core.synthesizer — cited answer generation via Gemini."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def sample_chunks() -> list[RetrievedChunk]:
 
 @pytest.fixture()
 def synthesizer():
-    with patch.dict("os.environ", {"GROQ_API_KEY": "test-key"}):
+    with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}):
         return Synthesizer(api_key="test-key")
 
 
@@ -143,19 +143,19 @@ class TestSynthesizerStream:
         assert full == NO_SOURCES_RESPONSE
 
     @pytest.mark.asyncio
-    async def test_streams_tokens_from_groq(
+    async def test_streams_tokens_from_gemini(
         self,
         synthesizer: Synthesizer,
         sample_chunks: list[RetrievedChunk],
     ):
-        """Mocked Groq stream should yield tokens that include citation markers."""
+        """Mocked Gemini stream should yield tokens that include citation markers."""
         streamed_tokens = [
             "Kafka ", "uses ", "a ", "distributed ", "commit ", "log ", "[1]. ",
             "RabbitMQ ", "implements ", "AMQP ", "[2].",
         ]
 
         mock_stream = _make_async_stream(streamed_tokens)
-        synthesizer._client.chat.completions.create = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream)
 
         collected: list[str] = []
         async for token in synthesizer.synthesize("Kafka vs RabbitMQ", sample_chunks):
@@ -167,26 +167,25 @@ class TestSynthesizerStream:
         assert len(collected) == len(streamed_tokens)
 
     @pytest.mark.asyncio
-    async def test_groq_called_with_correct_params(
+    async def test_gemini_called_with_correct_params(
         self,
         synthesizer: Synthesizer,
         sample_chunks: list[RetrievedChunk],
     ):
         mock_stream = _make_async_stream(["answer"])
-        mock_create = AsyncMock(return_value=mock_stream)
-        synthesizer._client.chat.completions.create = mock_create
+        mock_generate = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = mock_generate
 
         tokens = []
         async for t in synthesizer.synthesize("test", sample_chunks):
             tokens.append(t)
 
-        mock_create.assert_called_once()
-        kwargs = mock_create.call_args.kwargs
-        assert kwargs["temperature"] == 0.3
-        assert kwargs["max_tokens"] == 2048
-        assert kwargs["stream"] is True
-        assert kwargs["messages"][0]["role"] == "system"
-        assert kwargs["messages"][1]["role"] == "user"
+        mock_generate.assert_called_once()
+        kwargs = mock_generate.call_args.kwargs
+        assert kwargs["model"] == synthesizer._model
+        assert kwargs["config"].temperature == 0.3
+        assert kwargs["config"].max_output_tokens == 2048
+        assert kwargs["config"].system_instruction is not None
 
     @pytest.mark.asyncio
     async def test_custom_temperature_and_max_tokens(
@@ -195,17 +194,17 @@ class TestSynthesizerStream:
         sample_chunks: list[RetrievedChunk],
     ):
         mock_stream = _make_async_stream(["ok"])
-        mock_create = AsyncMock(return_value=mock_stream)
-        synthesizer._client.chat.completions.create = mock_create
+        mock_generate = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = mock_generate
 
         async for _ in synthesizer.synthesize(
             "test", sample_chunks, temperature=0.7, max_tokens=512
         ):
             pass
 
-        kwargs = mock_create.call_args.kwargs
-        assert kwargs["temperature"] == 0.7
-        assert kwargs["max_tokens"] == 512
+        kwargs = mock_generate.call_args.kwargs
+        assert kwargs["config"].temperature == 0.7
+        assert kwargs["config"].max_output_tokens == 512
 
     @pytest.mark.asyncio
     async def test_skips_empty_delta_content(
@@ -215,7 +214,7 @@ class TestSynthesizerStream:
     ):
         """Tokens with None or empty content should be silently skipped."""
         mock_stream = _make_async_stream(["hello", None, "", "world"])
-        synthesizer._client.chat.completions.create = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream)
 
         collected = []
         async for t in synthesizer.synthesize("test", sample_chunks):
@@ -236,7 +235,7 @@ class TestSynthesizeComplete:
         sample_chunks: list[RetrievedChunk],
     ):
         mock_stream = _make_async_stream(["Answer ", "with ", "[1] ", "citation."])
-        synthesizer._client.chat.completions.create = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream)
 
         result = await synthesizer.synthesize_complete("test", sample_chunks)
 
@@ -258,7 +257,7 @@ class TestSynthesizeComplete:
 # ---------------------------------------------------------------------------
 
 class _AsyncStreamIter:
-    """Mimics the async iterator returned by ``groq`` streaming calls."""
+    """Mimics the async iterator returned by streaming LLM calls."""
 
     def __init__(self, tokens: list[str | None]) -> None:
         self._tokens = tokens
@@ -273,9 +272,7 @@ class _AsyncStreamIter:
         token = self._tokens[self._idx]
         self._idx += 1
         chunk = MagicMock()
-        delta = MagicMock()
-        delta.content = token
-        chunk.choices = [MagicMock(delta=delta)]
+        chunk.text = token
         return chunk
 
 

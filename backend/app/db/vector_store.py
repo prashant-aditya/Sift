@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import chromadb
 import chromadb.errors
@@ -47,7 +47,7 @@ class VectorStore:
         read from ``Settings.chroma_persist_dir``.
     """
 
-    def __init__(self, persist_dir: str | None = None) -> None:
+    def __init__(self, persist_dir: Optional[str] = None) -> None:
         self._persist_dir = persist_dir or get_settings().chroma_persist_dir
         self._client = chromadb.PersistentClient(path=self._persist_dir)
 
@@ -68,7 +68,7 @@ class VectorStore:
         self,
         name: str,
         *,
-        metadata: dict[str, Any] | None = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> chromadb.Collection:
         """Return an existing collection or create a new one.
 
@@ -136,7 +136,7 @@ class VectorStore:
         collection_name: str,
         query_embedding: list[float],
         n_results: int = 10,
-        where: dict[str, Any] | None = None,
+        where: Optional[dict[str, Any]] = None,
     ) -> list[RetrievedChunk]:
         """Run a nearest-neighbour search against *collection_name*.
 
@@ -188,7 +188,7 @@ class VectorStore:
             logger.debug("Collection '%s' does not exist; nothing to delete", name)
             return False
 
-    def get_collection_stats(self, name: str) -> CollectionStats | None:
+    def get_collection_stats(self, name: str) -> Optional[CollectionStats]:
         """Return stats for a collection, or *None* if it does not exist."""
         try:
             collection = self._client.get_collection(name=name)
@@ -212,7 +212,7 @@ class VectorStore:
         session_id: str,
         query_embedding: list[float],
         n_results: int = 10,
-        where: dict[str, Any] | None = None,
+        where: Optional[dict[str, Any]] = None,
     ) -> list[RetrievedChunk]:
         return self.query(
             self.collection_name_for_session(session_id),
@@ -228,7 +228,7 @@ class VectorStore:
         self,
         query_embedding: list[float],
         n_results: int = 10,
-        where: dict[str, Any] | None = None,
+        where: Optional[dict[str, Any]] = None,
     ) -> list[RetrievedChunk]:
         return self.query(
             GLOBAL_COLLECTION_NAME,

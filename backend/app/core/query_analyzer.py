@@ -1,4 +1,4 @@
-"""Query decomposition engine using Groq LLM.
+"""Query decomposition engine using Google Gemini (GenAI) LLM.
 
 Breaks complex research queries into 2-4 focused sub-queries that can be
 independently searched across multiple sources.  Simple, already-focused
@@ -10,8 +10,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Optional
 
-from groq import AsyncGroq
+import httpx
+from google import genai
+from google.genai import types
 
 from app.config import get_settings
 
@@ -40,25 +43,31 @@ MAX_SUB_QUERIES = 4
 
 
 class QueryAnalyzer:
-    """Decomposes user queries into focused sub-queries via the Groq API.
+    """Decomposes user queries into focused sub-queries via the Gemini API.
 
     Parameters
     ----------
     api_key:
-        Groq API key.  Falls back to ``Settings.groq_api_key``.
+        Google API key. Falls back to ``Settings.google_api_key``.
     model:
         Chat model identifier.  Falls back to ``Settings.llm_model``.
     """
 
     def __init__(
         self,
-        api_key: str | None = None,
-        model: str | None = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> None:
         settings = get_settings()
-        self._api_key = api_key or settings.groq_api_key
+        self._provider = (settings.llm_provider or "google").lower()
+        self._api_key = api_key or (
+            settings.nvidia_api_key if self._provider == "nvidia" else settings.google_api_key
+        )
         self._model = model or settings.llm_model
-        self._client = AsyncGroq(api_key=self._api_key)
+        self._nvidia_base_url = settings.nvidia_base_url.rstrip("/")
+
+        # Use the async client surface for FastAPI usage.
+        self._client = genai.Client(api_key=self._api_key) if self._provider != "nvidia" else None
 
     async def decompose(self, query: str) -> list[str]:
         """Break *query* into a list of focused sub-queries.
@@ -71,20 +80,41 @@ class QueryAnalyzer:
         if not query:
             return []
 
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": DECOMPOSITION_SYSTEM_PROMPT},
-                {"role": "user", "content": query},
-            ],
-            temperature=DEFAULT_TEMPERATURE,
-        )
-
-        raw = (response.choices[0].message.content or "").strip()
+        if self._provider == "nvidia":
+            raw = await self._decompose_via_nvidia(query)
+        else:
+            response = await self._client.aio.models.generate_content(  # type: ignore[union-attr]
+                model=self._model,
+                contents=query,
+                config=types.GenerateContentConfig(
+                    system_instruction=DECOMPOSITION_SYSTEM_PROMPT,
+                    temperature=DEFAULT_TEMPERATURE,
+                ),
+            )
+            raw = (response.text or "").strip()
         logger.debug("QueryAnalyzer raw response: %s", raw)
 
         sub_queries = self._parse_response(raw, original_query=query)
         return sub_queries[:MAX_SUB_QUERIES]
+
+    async def _decompose_via_nvidia(self, query: str) -> str:
+        url = f"{self._nvidia_base_url}/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": DECOMPOSITION_SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            "temperature": DEFAULT_TEMPERATURE,
+            "stream": False,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            return ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
 
     @staticmethod
     def _parse_response(raw: str, *, original_query: str) -> list[str]:
@@ -120,7 +150,7 @@ class QueryAnalyzer:
         return [original_query]
 
 
-def _try_json_parse(text: str) -> list[str] | None:
+def _try_json_parse(text: str) -> Optional[list[str]]:
     """Return a list of non-empty strings if *text* is a valid JSON array."""
     try:
         data = json.loads(text)

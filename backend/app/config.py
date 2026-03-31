@@ -7,9 +7,18 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables / .env file."""
 
     groq_api_key: str = ""
+    google_api_key: str = ""
+    nvidia_api_key: str = ""
     hf_api_token: str = ""
 
-    llm_model: str = "llama-3.1-70b-versatile"
+    # LLM provider selection: "google" (Gemini) or "nvidia" (OpenAI-compatible endpoint).
+    llm_provider: str = "google"
+
+    # Default to a Gemini model when using GOOGLE_API_KEY.
+    llm_model: str = "gemini-2.5-flash"
+
+    # NVIDIA hosted endpoint base URL (OpenAI-compatible).
+    nvidia_base_url: str = "https://integrate.api.nvidia.com"
     embedding_model: str = "all-MiniLM-L6-v2"
 
     chroma_persist_dir: str = "./chroma_data"

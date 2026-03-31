@@ -12,7 +12,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Optional
 
 from app.core.query_analyzer import QueryAnalyzer
 from app.core.synthesizer import Synthesizer, build_citation_map
@@ -74,7 +74,7 @@ class ResearchOrchestrator:
     async def research(
         self,
         query: str,
-        sources: list[str] | None = None,
+        sources: Optional[list[str]] = None,
         depth: str = "standard",
     ) -> AsyncGenerator[dict[str, str], None]:
         """Execute the 7-step research pipeline as an SSE event stream.
@@ -192,7 +192,7 @@ class ResearchOrchestrator:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _resolve_adapters(self, sources: list[str] | None) -> list[SourceAdapter]:
+    def _resolve_adapters(self, sources: Optional[list[str]]) -> list[SourceAdapter]:
         """Map requested source names to available adapters.
 
         Falls back to all available adapters when *sources* is ``None`` or

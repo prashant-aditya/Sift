@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 import httpx
 
@@ -30,7 +31,7 @@ class HackerNewsAdapter(SourceAdapter):
         return True
 
     async def search(
-        self, query: str, max_results: int | None = None
+        self, query: str, max_results: Optional[int] = None
     ) -> list[SourceResult]:
         limit = max_results or self.max_results
         try:
@@ -67,7 +68,7 @@ class HackerNewsAdapter(SourceAdapter):
             points = hit.get("points", 0)
             num_comments = hit.get("num_comments", 0)
 
-            raw_content: str | None = None
+            raw_content: Optional[str] = None
             if idx < self._COMMENT_STORIES and num_comments > 0:
                 raw_content = await self._fetch_top_comments(client, story_id)
 
@@ -89,7 +90,7 @@ class HackerNewsAdapter(SourceAdapter):
 
     async def _fetch_top_comments(
         self, client: httpx.AsyncClient, story_id: str
-    ) -> str | None:
+    ) -> Optional[str]:
         try:
             resp = await client.get(f"{_ITEM_URL}/{story_id}")
             if resp.status_code != 200:

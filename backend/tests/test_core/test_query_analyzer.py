@@ -1,4 +1,4 @@
-"""Tests for app.core.query_analyzer — query decomposition via Groq."""
+"""Tests for app.core.query_analyzer — query decomposition via Gemini."""
 
 from __future__ import annotations
 
@@ -13,14 +13,9 @@ from app.core.query_analyzer import QueryAnalyzer, _try_json_parse
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_groq_response(content: str) -> MagicMock:
-    """Build a mock that mimics ``chat.completions.create`` return value."""
-    message = MagicMock()
-    message.content = content
-    choice = MagicMock()
-    choice.message = message
+def _mock_gemini_response(text: str) -> MagicMock:
     response = MagicMock()
-    response.choices = [choice]
+    response.text = text
     return response
 
 
@@ -59,16 +54,16 @@ class TestTryJsonParse:
 class TestQueryAnalyzerDecompose:
     @pytest.fixture()
     def analyzer(self):
-        with patch.dict("os.environ", {"GROQ_API_KEY": "test-key"}):
+        with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}):
             return QueryAnalyzer(api_key="test-key")
 
     @pytest.mark.asyncio
     async def test_complex_query_returns_json_array(self, analyzer: QueryAnalyzer):
         """LLM returns a valid JSON array — should be parsed correctly."""
         mock_content = '["What is Kafka?", "What is RabbitMQ?", "Kafka vs RabbitMQ trade-offs"]'
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("Compare Kafka and RabbitMQ")
 
@@ -81,9 +76,9 @@ class TestQueryAnalyzerDecompose:
     async def test_simple_query_passthrough(self, analyzer: QueryAnalyzer):
         """A simple query should be returned as a single-element array."""
         mock_content = '["What is Python?"]'
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("What is Python?")
 
@@ -93,9 +88,9 @@ class TestQueryAnalyzerDecompose:
     async def test_json_with_markdown_fences(self, analyzer: QueryAnalyzer):
         """LLM wraps JSON in markdown code fences — should still parse."""
         mock_content = '```json\n["sub query 1", "sub query 2"]\n```'
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("complex question")
 
@@ -105,9 +100,9 @@ class TestQueryAnalyzerDecompose:
     async def test_fallback_to_newline_split(self, analyzer: QueryAnalyzer):
         """If the LLM returns plain text lines instead of JSON, fall back."""
         mock_content = "1. What is Docker?\n2. How does Kubernetes work?\n3. Docker vs Kubernetes"
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("Docker and Kubernetes")
 
@@ -119,9 +114,9 @@ class TestQueryAnalyzerDecompose:
     async def test_fallback_bullet_list(self, analyzer: QueryAnalyzer):
         """Bullet-prefixed lines should be cleaned and returned."""
         mock_content = "- What is React?\n- What is Vue?\n- React vs Vue"
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("React vs Vue")
 
@@ -142,9 +137,9 @@ class TestQueryAnalyzerDecompose:
     async def test_max_four_subqueries(self, analyzer: QueryAnalyzer):
         """Even if the LLM returns more than 4, we cap at MAX_SUB_QUERIES."""
         mock_content = '["q1", "q2", "q3", "q4", "q5", "q6"]'
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("big question")
 
@@ -154,27 +149,25 @@ class TestQueryAnalyzerDecompose:
     async def test_totally_unparseable_falls_back_to_original(self, analyzer: QueryAnalyzer):
         """If LLM returns gibberish with no usable lines, return original."""
         mock_content = ""
-        mock_resp = _mock_groq_response(mock_content)
+        mock_resp = _mock_gemini_response(mock_content)
 
-        analyzer._client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
         result = await analyzer.decompose("my original query")
 
         assert result == ["my original query"]
 
     @pytest.mark.asyncio
-    async def test_groq_api_called_with_correct_params(self, analyzer: QueryAnalyzer):
-        mock_resp = _mock_groq_response('["test"]')
-        mock_create = AsyncMock(return_value=mock_resp)
-        analyzer._client.chat.completions.create = mock_create
+    async def test_gemini_api_called_with_correct_params(self, analyzer: QueryAnalyzer):
+        mock_resp = _mock_gemini_response('["test"]')
+        mock_generate = AsyncMock(return_value=mock_resp)
+        analyzer._client.aio.models.generate_content = mock_generate
 
         await analyzer.decompose("test query")
 
-        mock_create.assert_called_once()
-        call_kwargs = mock_create.call_args
-        assert call_kwargs.kwargs["temperature"] == 0.1
-        assert call_kwargs.kwargs["model"] == analyzer._model
-        messages = call_kwargs.kwargs["messages"]
-        assert messages[0]["role"] == "system"
-        assert messages[1]["role"] == "user"
-        assert messages[1]["content"] == "test query"
+        mock_generate.assert_called_once()
+        call_kwargs = mock_generate.call_args.kwargs
+        assert call_kwargs["model"] == analyzer._model
+        assert call_kwargs["contents"] == "test query"
+        assert call_kwargs["config"].temperature == 0.1
+        assert call_kwargs["config"].system_instruction is not None
