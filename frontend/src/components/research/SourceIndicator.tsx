@@ -37,7 +37,11 @@ function SourcePill({ source }: { source: SourceStatus }) {
         "min-h-[44px] sm:min-h-0",
         "transition-colors duration-200 motion-reduce:transition-none",
         source.status === "waiting" &&
-          "border border-border bg-muted/50 text-muted-foreground",
+          cn(
+            "border bg-muted/50",
+            config?.borderClass ?? "border-border",
+            config?.textClass ?? "text-muted-foreground",
+          ),
         source.status === "searching" &&
           "border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400",
         source.status === "done" &&
@@ -47,7 +51,10 @@ function SourcePill({ source }: { source: SourceStatus }) {
       )}
     >
       {Icon && source.status === "waiting" && (
-        <Icon className="size-3" aria-hidden="true" />
+        <Icon
+          className={cn("size-3", config?.textClass)}
+          aria-hidden="true"
+        />
       )}
 
       {source.status === "searching" && (

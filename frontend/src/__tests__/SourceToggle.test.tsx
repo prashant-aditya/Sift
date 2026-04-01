@@ -4,7 +4,7 @@ import { SourceToggle } from "@/components/research/SourceToggle";
 import { SOURCES } from "@/lib/constants";
 
 describe("SourceToggle", () => {
-  const duckDuckGo = SOURCES[0]; // ddg
+  const duckDuckGo = SOURCES[0]; // duckduckgo
 
   it("renders source display name and icon", () => {
     render(
@@ -20,7 +20,7 @@ describe("SourceToggle", () => {
     );
 
     fireEvent.click(screen.getByRole("switch"));
-    expect(onToggle).toHaveBeenCalledWith("ddg");
+    expect(onToggle).toHaveBeenCalledWith("duckduckgo");
   });
 
   it("has aria-checked=true when active", () => {

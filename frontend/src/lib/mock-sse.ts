@@ -37,7 +37,7 @@ const MOCK_CITATIONS: Citation[] = [
     id: 5,
     title: "Introduction to Neural Networks",
     url: "https://example.com/neural-networks",
-    source_name: "ddg",
+    source_name: "duckduckgo",
     relevance_score: 0.75,
   },
 ];
@@ -168,7 +168,7 @@ async function* generateMockEvents(): AsyncGenerator<string> {
   await sleep(400);
 
   const sources = [
-    { source: "ddg", results_count: 8, latency_ms: 320 },
+    { source: "duckduckgo", results_count: 8, latency_ms: 320 },
     { source: "reddit", results_count: 5, latency_ms: 450 },
     { source: "hackernews", results_count: 3, latency_ms: 280 },
     { source: "arxiv", results_count: 4, latency_ms: 620 },

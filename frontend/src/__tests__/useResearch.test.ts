@@ -58,7 +58,11 @@ describe("useResearch", () => {
       },
       {
         event: "source_complete",
-        data: JSON.stringify({ source: "ddg", results_count: 5, latency_ms: 200 }),
+        data: JSON.stringify({
+          source: "duckduckgo",
+          results_count: 5,
+          latency_ms: 200,
+        }),
       },
       {
         event: "status",
@@ -83,7 +87,7 @@ describe("useResearch", () => {
               id: 1,
               title: "Test Citation",
               url: "https://example.com",
-              source_name: "ddg",
+              source_name: "duckduckgo",
               relevance_score: 0.9,
             },
           ],
@@ -101,7 +105,11 @@ describe("useResearch", () => {
     const { result } = renderHook(() => useResearch());
 
     await act(async () => {
-      result.current.startResearch("test query", ["ddg", "reddit"], "standard");
+      result.current.startResearch(
+        "test query",
+        ["duckduckgo", "reddit"],
+        "standard",
+      );
       await vi.advanceTimersByTimeAsync(200);
     });
 
@@ -138,7 +146,7 @@ describe("useResearch", () => {
     const { result } = renderHook(() => useResearch());
 
     await act(async () => {
-      result.current.startResearch("test", ["ddg"], "quick");
+      result.current.startResearch("test", ["duckduckgo"], "quick");
       await vi.advanceTimersByTimeAsync(200);
     });
 
@@ -147,7 +155,13 @@ describe("useResearch", () => {
 
   it("populates citations on complete event", async () => {
     const citations = [
-      { id: 1, title: "Citation A", url: "https://a.com", source_name: "ddg", relevance_score: 0.9 },
+      {
+        id: 1,
+        title: "Citation A",
+        url: "https://a.com",
+        source_name: "duckduckgo",
+        relevance_score: 0.9,
+      },
       { id: 2, title: "Citation B", url: "https://b.com", source_name: "reddit", relevance_score: 0.8 },
     ];
 
@@ -173,7 +187,7 @@ describe("useResearch", () => {
     const { result } = renderHook(() => useResearch());
 
     await act(async () => {
-      result.current.startResearch("test", ["ddg", "reddit"], "standard");
+      result.current.startResearch("test", ["duckduckgo", "reddit"], "standard");
       await vi.advanceTimersByTimeAsync(200);
     });
 
@@ -200,7 +214,7 @@ describe("useResearch", () => {
     const { result } = renderHook(() => useResearch());
 
     await act(async () => {
-      result.current.startResearch("test", ["ddg"], "quick");
+      result.current.startResearch("test", ["duckduckgo"], "quick");
       await vi.advanceTimersByTimeAsync(200);
     });
 
@@ -217,7 +231,15 @@ describe("useResearch", () => {
           session_id: "s3",
           sources_used: 1,
           latency_ms: 100,
-          citations: [{ id: 1, title: "C", url: "https://c.com", source_name: "ddg", relevance_score: 0.5 }],
+          citations: [
+            {
+              id: 1,
+              title: "C",
+              url: "https://c.com",
+              source_name: "duckduckgo",
+              relevance_score: 0.5,
+            },
+          ],
         }),
       },
     ];
@@ -232,7 +254,7 @@ describe("useResearch", () => {
     const { result } = renderHook(() => useResearch());
 
     await act(async () => {
-      result.current.startResearch("test", ["ddg"], "quick");
+      result.current.startResearch("test", ["duckduckgo"], "quick");
       await vi.advanceTimersByTimeAsync(200);
     });
 
@@ -255,12 +277,12 @@ describe("useResearch", () => {
     const { result } = renderHook(() => useResearch());
 
     await act(async () => {
-      result.current.startResearch("test", ["ddg", "reddit"], "standard");
+      result.current.startResearch("test", ["duckduckgo", "reddit"], "standard");
       await vi.advanceTimersByTimeAsync(50);
     });
 
     expect(result.current.sourceStatuses).toHaveLength(2);
-    expect(result.current.sourceStatuses[0].name).toBe("ddg");
+    expect(result.current.sourceStatuses[0].name).toBe("duckduckgo");
     expect(result.current.sourceStatuses[0].status).toBe("waiting");
     expect(result.current.sourceStatuses[1].name).toBe("reddit");
     expect(result.current.sourceStatuses[1].status).toBe("waiting");

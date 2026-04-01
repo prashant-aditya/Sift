@@ -16,7 +16,9 @@ export function formatRelativeTime(date: string | Date): string {
   return formatDistanceToNow(d, { addSuffix: true })
 }
 
-export function truncateUrl(url: string, maxLength = 50): string {
+export function truncateUrl(url: string | null | undefined, maxLength = 50): string {
+  if (!url) return ""
+
   try {
     const urlObj = new URL(url)
     const domain = urlObj.hostname.replace("www.", "")

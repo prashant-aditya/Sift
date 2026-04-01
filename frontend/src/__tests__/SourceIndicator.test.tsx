@@ -20,7 +20,11 @@ describe("SourceIndicator", () => {
 
   it("shows waiting state correctly", () => {
     const statuses: SourceStatus[] = [
-      makeStatus({ name: "ddg", displayName: "DuckDuckGo", status: "waiting" }),
+      makeStatus({
+        name: "duckduckgo",
+        displayName: "DuckDuckGo",
+        status: "waiting",
+      }),
     ];
     render(<SourceIndicator sourceStatuses={statuses} />);
 
@@ -85,7 +89,11 @@ describe("SourceIndicator", () => {
 
   it("renders multiple sources simultaneously", () => {
     const statuses: SourceStatus[] = [
-      makeStatus({ name: "ddg", displayName: "DuckDuckGo", status: "waiting" }),
+      makeStatus({
+        name: "duckduckgo",
+        displayName: "DuckDuckGo",
+        status: "waiting",
+      }),
       makeStatus({ name: "reddit", displayName: "Reddit", status: "searching" }),
       makeStatus({
         name: "arxiv",

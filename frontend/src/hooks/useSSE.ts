@@ -58,9 +58,12 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
           method,
           headers: {
             "Content-Type": "application/json",
+            Accept: "text/event-stream",
             ...headers,
           },
           body: body ? JSON.stringify(body) : undefined,
+          cache: "no-store",
+          credentials: "include",
           signal: controller.signal,
         });
       }

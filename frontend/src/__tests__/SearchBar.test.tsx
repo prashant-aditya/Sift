@@ -4,7 +4,20 @@ import { describe, it, expect, vi } from "vitest";
 import { SearchBar } from "@/components/research/SearchBar";
 
 vi.mock("@/components/ui/select", () => ({
-  Select: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <div data-testid="select" {...props}>{children}</div>,
+  Select: ({
+    children,
+    onValueChange,
+    ...props
+  }: React.PropsWithChildren<Record<string, unknown>>) => (
+    // The real `Select` consumes `onValueChange`; our mock shouldn't forward it to the DOM.
+    // We still "use" it to avoid unused-var lint warnings.
+    (void onValueChange,
+    (
+      <div data-testid="select" {...props}>
+        {children}
+      </div>
+    ))
+  ),
   SelectContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   SelectItem: ({ children, value }: React.PropsWithChildren<{ value: string }>) => <option value={value}>{children}</option>,
   SelectTrigger: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <button {...props}>{children}</button>,
