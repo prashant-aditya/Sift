@@ -188,7 +188,12 @@ function KnowledgeGraphSvgRenderer({
 
       if (!mounted) return;
 
-      const svg = d3.select(svgRef.current) as any;
+      const svg = d3.select(svgRef.current) as import("d3-selection").Selection<
+        SVGSVGElement,
+        unknown,
+        null,
+        undefined
+      >;
       svg.selectAll("*").remove();
 
       svg
@@ -234,7 +239,7 @@ function KnowledgeGraphSvgRenderer({
       const nodeLayer = g
         .append("g")
         .attr("fill-opacity", 1)
-        .selectAll("circle")
+        .selectAll<SVGCircleElement, SimNode>("circle")
         .data(nodes, (d: SimNode) => d.id)
         .join("circle")
         .attr("r", (d: SimNode) => nodeRadius(d))
