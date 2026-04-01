@@ -34,6 +34,7 @@ async def _arxiv_throttle() -> None:
             await sleep(wait_for)
         _arxiv_last_request_at = time.monotonic()
 
+
 class ArxivAdapter(SourceAdapter):
     """Searches ArXiv papers via the public Atom API (no key required).
 
@@ -48,10 +49,14 @@ class ArxivAdapter(SourceAdapter):
     def is_available(self) -> bool:
         return True
 
-    async def search(self, query: str, max_results: Optional[int] = None) -> list[SourceResult]:
+    async def search(
+        self, query: str, max_results: Optional[int] = None
+    ) -> list[SourceResult]:
         limit = max_results or self.max_results
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, headers=_ARXIV_HEADERS) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_seconds, headers=_ARXIV_HEADERS
+            ) as client:
                 await _arxiv_throttle()
                 resp = await client.get(
                     _ARXIV_API,
@@ -104,15 +109,19 @@ class ArxivAdapter(SourceAdapter):
             published_date: datetime | None = None
             if published_raw:
                 try:
-                    published_date = datetime.fromisoformat(published_raw.replace("Z", "+00:00")).astimezone(
-                        timezone.utc
-                    )
+                    published_date = datetime.fromisoformat(
+                        published_raw.replace("Z", "+00:00")
+                    ).astimezone(timezone.utc)
                 except Exception:
                     published_date = None
 
             authors: list[str] = []
             for a in getattr(entry, "authors", []) or []:
-                name = str((a or {}).get("name") or "").strip() if isinstance(a, dict) else str(getattr(a, "name", "") or "").strip()
+                name = (
+                    str((a or {}).get("name") or "").strip()
+                    if isinstance(a, dict)
+                    else str(getattr(a, "name", "") or "").strip()
+                )
                 if name:
                     authors.append(name)
 
@@ -126,7 +135,11 @@ class ArxivAdapter(SourceAdapter):
                 link_type = str(link.get("type") or "").lower()
                 title_hint = str(link.get("title") or "").lower()
                 rel = str(link.get("rel") or "").lower()
-                if link_type == "application/pdf" or "pdf" in title_hint or (rel == "related" and "pdf" in href):
+                if (
+                    link_type == "application/pdf"
+                    or "pdf" in title_hint
+                    or (rel == "related" and "pdf" in href)
+                ):
                     pdf_url = href
                     break
 
@@ -146,4 +159,3 @@ class ArxivAdapter(SourceAdapter):
             )
 
         return results
-

@@ -20,4 +20,3 @@ def set_session_id(session_id: str | None) -> None:
 
 def get_session_id() -> str | None:
     return _session_id.get()
-

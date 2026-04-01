@@ -12,9 +12,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api.dependencies import get_current_user
 from app.db.models import ResearchSession, ResearchTurn
+from app.db.models import User
 
-router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
+router = APIRouter(prefix="/api/v1", tags=["sessions"])
 
 
 def _utcnow() -> datetime:
@@ -78,19 +80,22 @@ class SessionRenameRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
 
 
-@router.get("", response_model=SessionListResponse)
+@router.get("/sessions", response_model=SessionListResponse)
 async def list_sessions(
     request: Request,
+    user: User = Depends(get_current_user),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     include_archived: bool = Query(False),
     db: AsyncSession = Depends(_db),
 ) -> SessionListResponse:
-    stmt = select(ResearchSession)
+    stmt = select(ResearchSession).where(ResearchSession.user_id == user.id)
     if not include_archived:
         stmt = stmt.where(ResearchSession.status != "archived")
-    stmt = stmt.order_by(desc(ResearchSession.updated_at)).limit(per_page).offset(
-        (page - 1) * per_page
+    stmt = (
+        stmt.order_by(desc(ResearchSession.updated_at))
+        .limit(per_page)
+        .offset((page - 1) * per_page)
     )
 
     rows = (await db.execute(stmt)).scalars().all()
@@ -109,14 +114,15 @@ async def list_sessions(
     )
 
 
-@router.get("/{session_id}", response_model=SessionOut)
+@router.get("/sessions/{session_id}", response_model=SessionOut)
 async def get_session(
     session_id: UUID,
     request: Request,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(_db),
 ) -> SessionOut:
     session = await db.get(ResearchSession, session_id)
-    if session is None:
+    if session is None or session.user_id != user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     turns_stmt = (
@@ -147,32 +153,34 @@ async def get_session(
     )
 
 
-@router.patch("/{session_id}", response_model=SessionOut)
+@router.patch("/sessions/{session_id}", response_model=SessionOut)
 async def rename_session(
     session_id: UUID,
     body: SessionRenameRequest,
     request: Request,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(_db),
 ) -> SessionOut:
     session = await db.get(ResearchSession, session_id)
-    if session is None:
+    if session is None or session.user_id != user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     session.name = body.name
     session.updated_at = _utcnow()
     await db.commit()
     await db.refresh(session)
-    return await get_session(session_id=session_id, request=request, db=db)
+    return await get_session(session_id=session_id, request=request, user=user, db=db)
 
 
-@router.delete("/{session_id}", status_code=204)
+@router.delete("/sessions/{session_id}", status_code=204)
 async def archive_session(
     session_id: UUID,
     request: Request,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(_db),
 ) -> None:
     session = await db.get(ResearchSession, session_id)
-    if session is None:
+    if session is None or session.user_id != user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     session.status = "archived"
@@ -181,3 +189,14 @@ async def archive_session(
     await db.commit()
     return None
 
+
+class KnowledgeListResponse(BaseModel):
+    data: list[dict]
+
+
+@router.get("/knowledge", response_model=KnowledgeListResponse, tags=["knowledge"])
+async def list_knowledge(
+    _user: User = Depends(get_current_user),
+) -> KnowledgeListResponse:
+    # Placeholder: the knowledge feature will be implemented in a later goal.
+    return KnowledgeListResponse(data=[])

@@ -30,8 +30,31 @@ def setup_logging(*, default_level: str = "INFO") -> None:
 
     Environment variables:
     - LOG_LEVEL: DEBUG|INFO|WARNING|ERROR
+    - LOG_FORMAT: text|json
     """
     level = (os.getenv("LOG_LEVEL") or default_level).upper()
+    log_format = (os.getenv("LOG_FORMAT") or "text").lower().strip()
+
+    if log_format == "json":
+        import structlog
+
+        structlog.configure(
+            processors=[
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.TimeStamper(fmt="iso", utc=True),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+                structlog.processors.JSONRenderer(),
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
+
+        # Keep stdlib logging minimal; structlog emits JSON.
+        logging.basicConfig(level=level)
+        return
 
     config: dict[str, Any] = {
         "version": 1,
@@ -54,10 +77,17 @@ def setup_logging(*, default_level: str = "INFO") -> None:
         "loggers": {
             # Ensure uvicorn logs go through our formatter/handler.
             "uvicorn": {"level": level, "handlers": ["console"], "propagate": False},
-            "uvicorn.error": {"level": level, "handlers": ["console"], "propagate": False},
-            "uvicorn.access": {"level": level, "handlers": ["console"], "propagate": False},
+            "uvicorn.error": {
+                "level": level,
+                "handlers": ["console"],
+                "propagate": False,
+            },
+            "uvicorn.access": {
+                "level": level,
+                "handlers": ["console"],
+                "propagate": False,
+            },
         },
     }
 
     logging.config.dictConfig(config)
-

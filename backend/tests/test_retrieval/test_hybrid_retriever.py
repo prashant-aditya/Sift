@@ -44,7 +44,9 @@ class _FakeDense(DenseRetriever):
         # Don't call parent init (no vector store / embedder needed)
         self._ranked = list(ranked)
 
-    async def retrieve(self, *, query: str, session_id: str, top_k: int = 50, where=None):
+    async def retrieve(
+        self, *, query: str, session_id: str, top_k: int = 50, where=None
+    ):
         return self._ranked[:top_k]
 
 
@@ -77,7 +79,9 @@ class TestHybridRetriever:
         retriever = HybridRetriever(dense=dense)
 
         # Use a query that BM25 cannot match so we degrade to dense-only ranking.
-        out = await retriever.retrieve(query="zzzz_unmatched", session_id="s1", chunks=[c1, c2], top_k=2)
+        out = await retriever.retrieve(
+            query="zzzz_unmatched", session_id="s1", chunks=[c1, c2], top_k=2
+        )
         assert [rc.chunk.chunk_id for rc in out] == ["c2", "c1"]
 
     @pytest.mark.asyncio
@@ -87,7 +91,9 @@ class TestHybridRetriever:
         dense = _FakeDense([])
         retriever = HybridRetriever(dense=dense)
 
-        out = await retriever.retrieve(query="raft consensus", session_id="s1", chunks=[c1, c2], top_k=2)
+        out = await retriever.retrieve(
+            query="raft consensus", session_id="s1", chunks=[c1, c2], top_k=2
+        )
         assert out
         assert out[0].chunk.chunk_id == "c1"
 
@@ -102,13 +108,16 @@ class TestHybridRetriever:
         ]
 
         # Dense ranks all "same" first to stress diversity enforcement.
-        dense_ranked = [_make_retrieved(c, 1.0 - i * 0.01) for i, c in enumerate(chunks)]
+        dense_ranked = [
+            _make_retrieved(c, 1.0 - i * 0.01) for i, c in enumerate(chunks)
+        ]
         dense = _FakeDense(dense_ranked)
         retriever = HybridRetriever(dense=dense, max_per_source=3)
 
-        out = await retriever.retrieve(query="alpha", session_id="s1", chunks=chunks, top_k=5)
+        out = await retriever.retrieve(
+            query="alpha", session_id="s1", chunks=chunks, top_k=5
+        )
         assert len(out) == 5
         same_count = sum(1 for rc in out if rc.chunk.source_name == "same")
         assert same_count <= 3
         assert sum(1 for rc in out if rc.chunk.source_name == "other") >= 2
-

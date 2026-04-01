@@ -93,7 +93,7 @@ class TestFit:
 
     def test_doc_freqs(self, fitted_index: BM25Index) -> None:
         assert fitted_index._doc_freqs["python"] == 3  # appears in docs 0, 3, 4
-        assert fitted_index._doc_freqs["rust"] == 2    # appears in docs 2, 3
+        assert fitted_index._doc_freqs["rust"] == 2  # appears in docs 2, 3
 
     def test_fit_replaces_prior_state(self, fitted_index: BM25Index) -> None:
         fitted_index.fit(["single document"])
@@ -120,7 +120,10 @@ class TestQuery:
         results = fitted_index.query("Python programming")
         assert len(results) > 0
         top_doc = results[0]
-        assert "python" in top_doc.document.lower() or "programming" in top_doc.document.lower()
+        assert (
+            "python" in top_doc.document.lower()
+            or "programming" in top_doc.document.lower()
+        )
 
     def test_exact_keyword_top_ranked(self, fitted_index: BM25Index) -> None:
         """A query for 'Rust memory safety' should rank doc 2 highest."""
@@ -182,7 +185,7 @@ class TestQuery:
             "cat lizard parrot",
         ]
         idx = BM25Index().fit(docs)
-        idf_cat = idx._idf("cat")    # df=4 (all docs)
+        idf_cat = idx._idf("cat")  # df=4 (all docs)
         idf_bird = idx._idf("bird")  # df=1
         assert idf_bird > idf_cat
 
@@ -238,7 +241,9 @@ class TestAddDocuments:
         assert len(results) > 0
         assert any("Kubernetes" in r.document for r in results)
 
-    def test_new_doc_ranked_first_for_unique_term(self, fitted_index: BM25Index) -> None:
+    def test_new_doc_ranked_first_for_unique_term(
+        self, fitted_index: BM25Index
+    ) -> None:
         fitted_index.add_documents(["Quantum computing leverages superposition"])
         results = fitted_index.query("quantum superposition")
         assert results[0].document == "Quantum computing leverages superposition"

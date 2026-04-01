@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from app.ingestion.chunker import TextChunker
 from app.ingestion.embedder import DIMENSIONS, EmbeddingGenerator
-from app.ingestion.extractors import ContentExtractor
 from app.ingestion.pipeline import IngestionPipeline
 from app.sources.base import SourceResult
 

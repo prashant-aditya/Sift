@@ -53,4 +53,3 @@ NO_SOURCES_RESPONSE = (
 # Synthesis user-message templates (the actual user content passed to the LLM).
 SYNTHESIS_SOURCE_HEADER_TEMPLATE = "[{idx}] (source: {source_name} — {source_title})"
 SYNTHESIS_USER_MESSAGE_TEMPLATE = "Sources:\n{sources_text}\n\nQuery: {query}"
-

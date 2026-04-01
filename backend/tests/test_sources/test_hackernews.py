@@ -92,9 +92,7 @@ class TestHackerNewsValidResponse:
 class TestHackerNewsEmptyResults:
     @respx.mock
     async def test_no_hits(self, adapter: HackerNewsAdapter):
-        respx.get(_SEARCH_URL).mock(
-            return_value=httpx.Response(200, json={"hits": []})
-        )
+        respx.get(_SEARCH_URL).mock(return_value=httpx.Response(200, json={"hits": []}))
 
         results = await adapter.search("xyznonexistent123")
         assert results == []
@@ -124,9 +122,7 @@ class TestHackerNewsMalformedResponse:
         respx.get(_SEARCH_URL).mock(
             return_value=httpx.Response(200, json=_algolia_response(1))
         )
-        respx.get(f"{_ITEM_URL}/1000").mock(
-            return_value=httpx.Response(500)
-        )
+        respx.get(f"{_ITEM_URL}/1000").mock(return_value=httpx.Response(500))
 
         results = await adapter.search("error comments")
         assert len(results) == 1

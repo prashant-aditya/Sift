@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
 from app.core.orchestrator import (
-    DEPTH_CONFIG,
     ResearchOrchestrator,
     _aggregate_source_counts,
     _sse_event,
@@ -31,6 +30,7 @@ from app.sources.registry import SourceRegistry
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_source_result(
     *,
@@ -111,7 +111,9 @@ class FakeAdapter(SourceAdapter):
         self._error = error
         self._available = available
 
-    async def search(self, query: str, max_results: int | None = None) -> list[SourceResult]:
+    async def search(
+        self, query: str, max_results: int | None = None
+    ) -> list[SourceResult]:
         if self._error:
             raise self._error
         return self._results[: max_results or len(self._results)]
@@ -135,6 +137,7 @@ async def _collect_events(gen) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def mock_query_analyzer():
@@ -160,8 +163,12 @@ def mock_vector_store():
     store.upsert_chunks = MagicMock(return_value=2)
 
     retrieved = [
-        _make_retrieved_chunk(chunk_id="c1", text="relevant chunk 1", source_name="duckduckgo"),
-        _make_retrieved_chunk(chunk_id="c2", text="relevant chunk 2", source_name="wikipedia"),
+        _make_retrieved_chunk(
+            chunk_id="c1", text="relevant chunk 1", source_name="duckduckgo"
+        ),
+        _make_retrieved_chunk(
+            chunk_id="c2", text="relevant chunk 2", source_name="wikipedia"
+        ),
     ]
     store.query_session = MagicMock(return_value=retrieved)
     return store
@@ -191,21 +198,25 @@ def mock_synthesizer():
 @pytest.fixture()
 def source_registry_with_adapters():
     registry = SourceRegistry()
-    registry.register(FakeAdapter(
-        name="duckduckgo",
-        display_name="DuckDuckGo",
-        results=[
-            _make_source_result(source_name="duckduckgo", title="DDG Result 1"),
-            _make_source_result(source_name="duckduckgo", title="DDG Result 2"),
-        ],
-    ))
-    registry.register(FakeAdapter(
-        name="wikipedia",
-        display_name="Wikipedia",
-        results=[
-            _make_source_result(source_name="wikipedia", title="Wiki Result"),
-        ],
-    ))
+    registry.register(
+        FakeAdapter(
+            name="duckduckgo",
+            display_name="DuckDuckGo",
+            results=[
+                _make_source_result(source_name="duckduckgo", title="DDG Result 1"),
+                _make_source_result(source_name="duckduckgo", title="DDG Result 2"),
+            ],
+        )
+    )
+    registry.register(
+        FakeAdapter(
+            name="wikipedia",
+            display_name="Wikipedia",
+            results=[
+                _make_source_result(source_name="wikipedia", title="Wiki Result"),
+            ],
+        )
+    )
     return registry
 
 
@@ -232,6 +243,7 @@ def orchestrator(
 # _sse_event unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestSSEEvent:
     def test_returns_dict_with_event_and_json_data(self):
         result = _sse_event("status", {"phase": "decomposing"})
@@ -241,10 +253,13 @@ class TestSSEEvent:
         assert parsed["phase"] == "decomposing"
 
     def test_handles_nested_data(self):
-        result = _sse_event("complete", {
-            "session_id": "s1",
-            "citations": [{"id": 1, "url": "https://example.com"}],
-        })
+        result = _sse_event(
+            "complete",
+            {
+                "session_id": "s1",
+                "citations": [{"id": 1, "url": "https://example.com"}],
+            },
+        )
         parsed = json.loads(result["data"])
         assert parsed["citations"][0]["id"] == 1
 
@@ -252,6 +267,7 @@ class TestSSEEvent:
 # ---------------------------------------------------------------------------
 # _aggregate_source_counts unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestAggregateSourceCounts:
     def test_counts_by_source_name(self):
@@ -273,6 +289,7 @@ class TestAggregateSourceCounts:
 # ---------------------------------------------------------------------------
 # Full pipeline e2e (all mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestResearchPipelineE2E:
     @pytest.mark.asyncio
@@ -317,7 +334,8 @@ class TestResearchPipelineE2E:
         events = await _collect_events(orchestrator.research("test query"))
 
         decomposed = next(
-            e for e in events
+            e
+            for e in events
             if e["event"] == "status" and e["data"].get("phase") == "decomposed"
         )
         assert decomposed["data"]["sub_queries"] == ["sub-query-1", "sub-query-2"]
@@ -327,7 +345,8 @@ class TestResearchPipelineE2E:
         events = await _collect_events(orchestrator.research("test query"))
 
         searching = next(
-            e for e in events
+            e
+            for e in events
             if e["event"] == "status" and e["data"].get("phase") == "searching"
         )
         assert searching["data"]["sources_active"] == 2
@@ -347,17 +366,26 @@ class TestResearchPipelineE2E:
     async def test_all_pipeline_phases_present(self, orchestrator):
         events = await _collect_events(orchestrator.research("test query"))
 
-        status_phases = [
-            e["data"]["phase"]
-            for e in events if e["event"] == "status"
-        ]
-        for expected in ["decomposing", "decomposed", "searching", "processing", "storing", "retrieving", "synthesizing"]:
+        status_phases = [e["data"]["phase"] for e in events if e["event"] == "status"]
+        for expected in [
+            "decomposing",
+            "decomposed",
+            "searching",
+            "processing",
+            "storing",
+            "retrieving",
+            "synthesizing",
+        ]:
             assert expected in status_phases, f"Missing phase: {expected}"
 
     @pytest.mark.asyncio
     async def test_depth_quick_uses_correct_config(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         registry = SourceRegistry()
         adapter = FakeAdapter(
@@ -376,7 +404,7 @@ class TestResearchPipelineE2E:
             synthesizer=mock_synthesizer,
         )
 
-        events = await _collect_events(orch.research("test", depth="quick"))
+        await _collect_events(orch.research("test", depth="quick"))
 
         assert mock_vector_store.query_session.called
         # DenseRetriever fetches dense_top_k (=50) for hybrid fusion.
@@ -385,8 +413,12 @@ class TestResearchPipelineE2E:
 
     @pytest.mark.asyncio
     async def test_depth_deep_uses_correct_config(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         registry = SourceRegistry()
         adapter = FakeAdapter(
@@ -405,15 +437,19 @@ class TestResearchPipelineE2E:
             synthesizer=mock_synthesizer,
         )
 
-        events = await _collect_events(orch.research("test", depth="deep"))
+        await _collect_events(orch.research("test", depth="deep"))
 
         call_args = mock_vector_store.query_session.call_args
         assert call_args[0][2] == 50
 
     @pytest.mark.asyncio
     async def test_specific_sources_filter(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
         source_registry_with_adapters,
     ):
         """When sources=['wikipedia'], only that adapter should be searched."""
@@ -437,29 +473,40 @@ class TestResearchPipelineE2E:
 # Partial source failure
 # ---------------------------------------------------------------------------
 
+
 class TestPartialSourceFailure:
     @pytest.mark.asyncio
     async def test_one_of_three_fails_still_returns_results(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         """If one source raises, the pipeline continues with the others."""
         registry = SourceRegistry()
-        registry.register(FakeAdapter(
-            name="good1",
-            display_name="Good 1",
-            results=[_make_source_result(source_name="good1")],
-        ))
-        registry.register(FakeAdapter(
-            name="failing",
-            display_name="Failing",
-            error=RuntimeError("connection timeout"),
-        ))
-        registry.register(FakeAdapter(
-            name="good2",
-            display_name="Good 2",
-            results=[_make_source_result(source_name="good2")],
-        ))
+        registry.register(
+            FakeAdapter(
+                name="good1",
+                display_name="Good 1",
+                results=[_make_source_result(source_name="good1")],
+            )
+        )
+        registry.register(
+            FakeAdapter(
+                name="failing",
+                display_name="Failing",
+                error=RuntimeError("connection timeout"),
+            )
+        )
+        registry.register(
+            FakeAdapter(
+                name="good2",
+                display_name="Good 2",
+                results=[_make_source_result(source_name="good2")],
+            )
+        )
 
         orch = ResearchOrchestrator(
             query_analyzer=mock_query_analyzer,
@@ -481,21 +528,29 @@ class TestPartialSourceFailure:
 
     @pytest.mark.asyncio
     async def test_partial_failure_records_errors(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         """Errors from failing sources should be included in the complete event."""
         registry = SourceRegistry()
-        registry.register(FakeAdapter(
-            name="good",
-            display_name="Good",
-            results=[_make_source_result(source_name="good")],
-        ))
-        registry.register(FakeAdapter(
-            name="bad",
-            display_name="Bad",
-            error=ValueError("API key invalid"),
-        ))
+        registry.register(
+            FakeAdapter(
+                name="good",
+                display_name="Good",
+                results=[_make_source_result(source_name="good")],
+            )
+        )
+        registry.register(
+            FakeAdapter(
+                name="bad",
+                display_name="Bad",
+                error=ValueError("API key invalid"),
+            )
+        )
 
         orch = ResearchOrchestrator(
             query_analyzer=mock_query_analyzer,
@@ -515,21 +570,29 @@ class TestPartialSourceFailure:
 
     @pytest.mark.asyncio
     async def test_all_sources_fail_yields_empty_complete(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         """When every source fails, the pipeline completes gracefully with empty results."""
         registry = SourceRegistry()
-        registry.register(FakeAdapter(
-            name="fail1",
-            display_name="Fail 1",
-            error=RuntimeError("down"),
-        ))
-        registry.register(FakeAdapter(
-            name="fail2",
-            display_name="Fail 2",
-            error=TimeoutError("timeout"),
-        ))
+        registry.register(
+            FakeAdapter(
+                name="fail1",
+                display_name="Fail 1",
+                error=RuntimeError("down"),
+            )
+        )
+        registry.register(
+            FakeAdapter(
+                name="fail2",
+                display_name="Fail 2",
+                error=TimeoutError("timeout"),
+            )
+        )
 
         orch = ResearchOrchestrator(
             query_analyzer=mock_query_analyzer,
@@ -552,19 +615,26 @@ class TestPartialSourceFailure:
 # Empty results handling
 # ---------------------------------------------------------------------------
 
+
 class TestEmptyResults:
     @pytest.mark.asyncio
     async def test_sources_return_empty_lists(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         """All sources succeed but return zero results."""
         registry = SourceRegistry()
-        registry.register(FakeAdapter(
-            name="empty",
-            display_name="Empty",
-            results=[],
-        ))
+        registry.register(
+            FakeAdapter(
+                name="empty",
+                display_name="Empty",
+                results=[],
+            )
+        )
 
         orch = ResearchOrchestrator(
             query_analyzer=mock_query_analyzer,
@@ -583,8 +653,12 @@ class TestEmptyResults:
 
     @pytest.mark.asyncio
     async def test_ingestion_produces_no_chunks(
-        self, mock_query_analyzer, source_registry_with_adapters,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        source_registry_with_adapters,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         """Sources return results, but ingestion produces no viable chunks."""
         empty_pipeline = MagicMock()
@@ -607,8 +681,12 @@ class TestEmptyResults:
 
     @pytest.mark.asyncio
     async def test_no_available_adapters(
-        self, mock_query_analyzer, mock_ingestion_pipeline,
-        mock_vector_store, mock_embedder, mock_synthesizer,
+        self,
+        mock_query_analyzer,
+        mock_ingestion_pipeline,
+        mock_vector_store,
+        mock_embedder,
+        mock_synthesizer,
     ):
         """Empty registry should yield immediate complete with error."""
         empty_registry = SourceRegistry()
@@ -632,6 +710,7 @@ class TestEmptyResults:
 # ---------------------------------------------------------------------------
 # SSE event format validation
 # ---------------------------------------------------------------------------
+
 
 class TestSSEEventFormat:
     @pytest.mark.asyncio
@@ -708,8 +787,11 @@ class TestSSEEventFormat:
 # _resolve_adapters tests
 # ---------------------------------------------------------------------------
 
+
 class TestResolveAdapters:
-    def test_none_sources_returns_all_available(self, orchestrator, source_registry_with_adapters):
+    def test_none_sources_returns_all_available(
+        self, orchestrator, source_registry_with_adapters
+    ):
         adapters = orchestrator._resolve_adapters(None)
         assert len(adapters) == 2
 
@@ -729,8 +811,12 @@ class TestResolveAdapters:
 
     def test_unavailable_adapter_skipped(self):
         registry = SourceRegistry()
-        registry.register(FakeAdapter(name="offline", display_name="Offline", available=False))
-        registry.register(FakeAdapter(name="online", display_name="Online", available=True))
+        registry.register(
+            FakeAdapter(name="offline", display_name="Offline", available=False)
+        )
+        registry.register(
+            FakeAdapter(name="online", display_name="Online", available=True)
+        )
 
         orch = ResearchOrchestrator(
             query_analyzer=MagicMock(),
@@ -750,6 +836,7 @@ class TestResolveAdapters:
 # _safe_search tests
 # ---------------------------------------------------------------------------
 
+
 class TestSafeSearch:
     @pytest.mark.asyncio
     async def test_successful_search_returns_results(self):
@@ -765,7 +852,8 @@ class TestSafeSearch:
     @pytest.mark.asyncio
     async def test_failed_search_returns_empty_with_error(self):
         adapter = FakeAdapter(
-            name="broken", display_name="Broken",
+            name="broken",
+            display_name="Broken",
             error=ConnectionError("refused"),
         )
 

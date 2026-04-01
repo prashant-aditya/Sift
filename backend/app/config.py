@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,9 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     nvidia_api_key: str = ""
     hf_api_token: str = ""
+
+    # Supabase Auth (JWT verification)
+    supabase_jwt_secret: str = ""
 
     # LLM provider selection: "google" (Gemini) or "nvidia" (OpenAI-compatible endpoint).
     llm_provider: str = "google"
@@ -22,7 +26,11 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
 
     chroma_persist_dir: str = "./chroma_data"
-    redis_url: str = "redis://redis:6379/1"
+    # Support multiple env var names for free-tier deployments.
+    redis_url: str = Field(
+        default="redis://redis:6379/1",
+        validation_alias="UPSTASH_REDIS_URL",
+    )
     database_url: str = "sqlite+aiosqlite:///./sift.db"
 
     max_sources_per_query: int = 5

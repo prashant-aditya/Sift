@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  render-deploy-hook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure deploy hook configured
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [[ -z "${RENDER_DEPLOY_HOOK_URL}" ]]; then
+            echo "Missing secret RENDER_DEPLOY_HOOK_URL. Add your Render Deploy Hook URL in GitHub repo settings."
+            exit 1
+          fi
+
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}"
+

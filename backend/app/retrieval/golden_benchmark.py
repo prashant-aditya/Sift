@@ -52,7 +52,9 @@ def _mrr(examples: list[GoldenExample], rankings: dict[str, list[str]]) -> float
     return total / max(len(examples), 1)
 
 
-def _recall_at_k(examples: list[GoldenExample], rankings: dict[str, list[str]], k: int) -> float:
+def _recall_at_k(
+    examples: list[GoldenExample], rankings: dict[str, list[str]], k: int
+) -> float:
     hits = 0
     for ex in examples:
         topk = set(rankings.get(ex.query, [])[:k])
@@ -72,7 +74,9 @@ class _PseudoDenseRetriever:
         self._chunks = chunks
         self._chunk_tokens = {c.chunk_id: set(tokenize(c.text)) for c in chunks}
 
-    async def retrieve(self, *, query: str, session_id: str, top_k: int = 50, where=None):
+    async def retrieve(
+        self, *, query: str, session_id: str, top_k: int = 50, where=None
+    ):
         q = set(tokenize(query))
         scored: list[tuple[float, Chunk]] = []
         for c in self._chunks:
@@ -99,29 +103,86 @@ class _PseudoDenseRetriever:
 
 def _build_golden() -> tuple[list[Chunk], list[GoldenExample]]:
     chunks = [
-        _make_chunk(chunk_id="c_kafka_1", source_name="wiki", text="Kafka is a distributed event streaming platform with partitions."),
-        _make_chunk(chunk_id="c_rabbit_1", source_name="wiki", text="RabbitMQ is a message broker implementing AMQP with queues and exchanges."),
-        _make_chunk(chunk_id="c_raft_1", source_name="arxiv", text="Raft is a consensus algorithm that is understandable and leader-based."),
-        _make_chunk(chunk_id="c_cqrs_1", source_name="hn", text="CQRS separates reads and writes; event sourcing stores immutable events."),
-        _make_chunk(chunk_id="c_cache_1", source_name="reddit", text="Cache invalidation is hard; consider write-through and TTL strategies."),
-        _make_chunk(chunk_id="c_k8s_1", source_name="wiki", text="Kubernetes orchestrates containers using pods, deployments, and services."),
-        _make_chunk(chunk_id="c_tls_1", source_name="ddg", text="TLS provides encryption in transit; certificates and handshakes establish trust."),
-        _make_chunk(chunk_id="c_vectordb_1", source_name="ddg", text="Vector databases store embeddings for similarity search; cosine distance is common."),
-        _make_chunk(chunk_id="c_bm25_1", source_name="wiki", text="BM25 is a bag-of-words ranking function using term frequency and inverse document frequency."),
-        _make_chunk(chunk_id="c_rrf_1", source_name="arxiv", text="Reciprocal Rank Fusion combines rankings via 1/(k + rank) without score normalization."),
+        _make_chunk(
+            chunk_id="c_kafka_1",
+            source_name="wiki",
+            text="Kafka is a distributed event streaming platform with partitions.",
+        ),
+        _make_chunk(
+            chunk_id="c_rabbit_1",
+            source_name="wiki",
+            text="RabbitMQ is a message broker implementing AMQP with queues and exchanges.",
+        ),
+        _make_chunk(
+            chunk_id="c_raft_1",
+            source_name="arxiv",
+            text="Raft is a consensus algorithm that is understandable and leader-based.",
+        ),
+        _make_chunk(
+            chunk_id="c_cqrs_1",
+            source_name="hn",
+            text="CQRS separates reads and writes; event sourcing stores immutable events.",
+        ),
+        _make_chunk(
+            chunk_id="c_cache_1",
+            source_name="reddit",
+            text="Cache invalidation is hard; consider write-through and TTL strategies.",
+        ),
+        _make_chunk(
+            chunk_id="c_k8s_1",
+            source_name="wiki",
+            text="Kubernetes orchestrates containers using pods, deployments, and services.",
+        ),
+        _make_chunk(
+            chunk_id="c_tls_1",
+            source_name="ddg",
+            text="TLS provides encryption in transit; certificates and handshakes establish trust.",
+        ),
+        _make_chunk(
+            chunk_id="c_vectordb_1",
+            source_name="ddg",
+            text="Vector databases store embeddings for similarity search; cosine distance is common.",
+        ),
+        _make_chunk(
+            chunk_id="c_bm25_1",
+            source_name="wiki",
+            text="BM25 is a bag-of-words ranking function using term frequency and inverse document frequency.",
+        ),
+        _make_chunk(
+            chunk_id="c_rrf_1",
+            source_name="arxiv",
+            text="Reciprocal Rank Fusion combines rankings via 1/(k + rank) without score normalization.",
+        ),
     ]
 
     golden = [
         GoldenExample(query="what is kafka used for", relevant_chunk_ids={"c_kafka_1"}),
-        GoldenExample(query="rabbitmq amqp queues exchanges", relevant_chunk_ids={"c_rabbit_1"}),
-        GoldenExample(query="raft leader based consensus", relevant_chunk_ids={"c_raft_1"}),
-        GoldenExample(query="cqrs versus event sourcing", relevant_chunk_ids={"c_cqrs_1"}),
-        GoldenExample(query="cache invalidation strategies ttl", relevant_chunk_ids={"c_cache_1"}),
-        GoldenExample(query="kubernetes pods deployments services", relevant_chunk_ids={"c_k8s_1"}),
-        GoldenExample(query="tls handshake certificates", relevant_chunk_ids={"c_tls_1"}),
-        GoldenExample(query="vector database cosine similarity", relevant_chunk_ids={"c_vectordb_1"}),
+        GoldenExample(
+            query="rabbitmq amqp queues exchanges", relevant_chunk_ids={"c_rabbit_1"}
+        ),
+        GoldenExample(
+            query="raft leader based consensus", relevant_chunk_ids={"c_raft_1"}
+        ),
+        GoldenExample(
+            query="cqrs versus event sourcing", relevant_chunk_ids={"c_cqrs_1"}
+        ),
+        GoldenExample(
+            query="cache invalidation strategies ttl", relevant_chunk_ids={"c_cache_1"}
+        ),
+        GoldenExample(
+            query="kubernetes pods deployments services", relevant_chunk_ids={"c_k8s_1"}
+        ),
+        GoldenExample(
+            query="tls handshake certificates", relevant_chunk_ids={"c_tls_1"}
+        ),
+        GoldenExample(
+            query="vector database cosine similarity",
+            relevant_chunk_ids={"c_vectordb_1"},
+        ),
         GoldenExample(query="bm25 idf term frequency", relevant_chunk_ids={"c_bm25_1"}),
-        GoldenExample(query="reciprocal rank fusion rrf formula", relevant_chunk_ids={"c_rrf_1"}),
+        GoldenExample(
+            query="reciprocal rank fusion rrf formula", relevant_chunk_ids={"c_rrf_1"}
+        ),
     ]
 
     return chunks, golden
@@ -142,7 +203,9 @@ async def _run() -> None:
     hybrid = HybridRetriever(dense=pseudo_dense, bm25_top_k=10, dense_top_k=10)
     hybrid_rankings: dict[str, list[str]] = {}
     for ex in golden:
-        out = await hybrid.retrieve(query=ex.query, session_id="golden", chunks=chunks, top_k=10)
+        out = await hybrid.retrieve(
+            query=ex.query, session_id="golden", chunks=chunks, top_k=10
+        )
         hybrid_rankings[ex.query] = [rc.chunk.chunk_id for rc in out]
 
     print("Golden benchmark (10 queries)")
@@ -160,4 +223,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -13,6 +13,7 @@ from app.core.query_analyzer import QueryAnalyzer, _try_json_parse
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _mock_gemini_response(text: str) -> MagicMock:
     response = MagicMock()
     response.text = text
@@ -22,6 +23,7 @@ def _mock_gemini_response(text: str) -> MagicMock:
 # ---------------------------------------------------------------------------
 # _try_json_parse unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestTryJsonParse:
     def test_valid_array(self):
@@ -51,6 +53,7 @@ class TestTryJsonParse:
 # QueryAnalyzer.decompose tests (Groq API mocked)
 # ---------------------------------------------------------------------------
 
+
 class TestQueryAnalyzerDecompose:
     @pytest.fixture()
     def analyzer(self):
@@ -60,7 +63,9 @@ class TestQueryAnalyzerDecompose:
     @pytest.mark.asyncio
     async def test_complex_query_returns_json_array(self, analyzer: QueryAnalyzer):
         """LLM returns a valid JSON array — should be parsed correctly."""
-        mock_content = '["What is Kafka?", "What is RabbitMQ?", "Kafka vs RabbitMQ trade-offs"]'
+        mock_content = (
+            '["What is Kafka?", "What is RabbitMQ?", "Kafka vs RabbitMQ trade-offs"]'
+        )
         mock_resp = _mock_gemini_response(mock_content)
 
         analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
@@ -99,7 +104,9 @@ class TestQueryAnalyzerDecompose:
     @pytest.mark.asyncio
     async def test_fallback_to_newline_split(self, analyzer: QueryAnalyzer):
         """If the LLM returns plain text lines instead of JSON, fall back."""
-        mock_content = "1. What is Docker?\n2. How does Kubernetes work?\n3. Docker vs Kubernetes"
+        mock_content = (
+            "1. What is Docker?\n2. How does Kubernetes work?\n3. Docker vs Kubernetes"
+        )
         mock_resp = _mock_gemini_response(mock_content)
 
         analyzer._client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
@@ -146,7 +153,9 @@ class TestQueryAnalyzerDecompose:
         assert len(result) == 4
 
     @pytest.mark.asyncio
-    async def test_totally_unparseable_falls_back_to_original(self, analyzer: QueryAnalyzer):
+    async def test_totally_unparseable_falls_back_to_original(
+        self, analyzer: QueryAnalyzer
+    ):
         """If LLM returns gibberish with no usable lines, return original."""
         mock_content = ""
         mock_resp = _mock_gemini_response(mock_content)

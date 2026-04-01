@@ -105,4 +105,3 @@ def process_results(  # type: ignore[no-untyped-def]
         "source_counts": source_counts,
         "errors": errors or None,
     }
-

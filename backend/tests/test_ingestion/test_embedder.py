@@ -30,7 +30,9 @@ class TestBatching:
         mock_resp.status_code = 200
         mock_resp.json.return_value = mock_hf_response(5)
 
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp):
+        with patch(
+            "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await gen.embed(texts)
 
         assert len(result) == 5
@@ -87,8 +89,10 @@ class TestRetries:
                 resp.json.return_value = mock_hf_response(1)
             return resp
 
-        with patch("httpx.AsyncClient.post", side_effect=_mock_post), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch("httpx.AsyncClient.post", side_effect=_mock_post),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             result = await gen.embed(["test"])
 
         assert call_count == 3
@@ -116,8 +120,10 @@ class TestRetries:
                 resp.json.return_value = mock_hf_response(1)
             return resp
 
-        with patch("httpx.AsyncClient.post", side_effect=_mock_post), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch("httpx.AsyncClient.post", side_effect=_mock_post),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             result = await gen.embed(["test"])
 
         assert call_count == 2
@@ -172,7 +178,9 @@ class TestNormalisation:
         mock_resp.status_code = 200
         mock_resp.json.return_value = token_level
 
-        with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp):
+        with patch(
+            "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await gen.embed(["test"])
 
         assert len(result) == 1

@@ -78,7 +78,9 @@ class ResearchCache:
         payload = json.dumps(data, ensure_ascii=False)
         await self.redis.set(key, payload, ex=self.fresh_ttl)
 
-    async def get_source_results(self, source: str, query_hash: str) -> Optional[list[dict[str, Any]]]:
+    async def get_source_results(
+        self, source: str, query_hash: str
+    ) -> Optional[list[dict[str, Any]]]:
         key = self._key_source(source, query_hash)
         raw = await self.redis.get(key)
         if raw is None:
@@ -95,7 +97,9 @@ class ResearchCache:
         except Exception:
             return None
 
-    async def set_source_results(self, source: str, query_hash: str, data: list[dict[str, Any]]) -> None:
+    async def set_source_results(
+        self, source: str, query_hash: str, data: list[dict[str, Any]]
+    ) -> None:
         key = self._key_source(source, query_hash)
         payload = json.dumps(data, ensure_ascii=False)
         await self.redis.set(key, payload, ex=self.source_ttl)
@@ -106,4 +110,3 @@ class ResearchCache:
         normalized = _PUNCT_RE.sub("", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-

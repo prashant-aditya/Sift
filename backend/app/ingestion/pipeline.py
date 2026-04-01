@@ -59,7 +59,9 @@ class IngestionPipeline:
             extracted.append((result, text))
 
         if not extracted:
-            logger.info("No extractable documents from %d source results", len(source_results))
+            logger.info(
+                "No extractable documents from %d source results", len(source_results)
+            )
             return []
 
         deduped_docs = extracted
@@ -88,7 +90,9 @@ class IngestionPipeline:
             all_chunks.extend(chunks)
 
         if not all_chunks:
-            logger.info("No chunks produced from %d source results", len(source_results))
+            logger.info(
+                "No chunks produced from %d source results", len(source_results)
+            )
             return []
 
         logger.info(

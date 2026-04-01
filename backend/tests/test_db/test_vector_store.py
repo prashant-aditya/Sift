@@ -68,7 +68,9 @@ def persist_dir(tmp_path) -> str:
 class TestUpsertAndQuery:
     def test_upsert_and_query_round_trip(self, store: VectorStore):
         emb = _random_embedding(1.0)
-        chunk = _make_chunk(text="Kafka is a distributed event streaming platform.", embedding=emb)
+        chunk = _make_chunk(
+            text="Kafka is a distributed event streaming platform.", embedding=emb
+        )
 
         count = store.upsert_chunks("test_col", [chunk])
         assert count == 1
@@ -83,8 +85,12 @@ class TestUpsertAndQuery:
     def test_upsert_multiple_chunks_returns_ranked_results(self, store: VectorStore):
         query_emb = _random_embedding(1.0)
 
-        close_chunk = _make_chunk(text="Close match", source_name="close", embedding=_random_embedding(1.0))
-        far_chunk = _make_chunk(text="Far match", source_name="far", embedding=_random_embedding(100.0))
+        close_chunk = _make_chunk(
+            text="Close match", source_name="close", embedding=_random_embedding(1.0)
+        )
+        far_chunk = _make_chunk(
+            text="Far match", source_name="far", embedding=_random_embedding(100.0)
+        )
 
         store.upsert_chunks("ranked", [close_chunk, far_chunk])
 
@@ -144,8 +150,14 @@ class TestMetadataFiltering:
     def test_filter_by_source_name(self, store: VectorStore):
         emb = _random_embedding(5.0)
 
-        wiki_chunk = _make_chunk(text="From Wikipedia", source_name="wikipedia", embedding=_random_embedding(5.0))
-        reddit_chunk = _make_chunk(text="From Reddit", source_name="reddit", embedding=_random_embedding(5.1))
+        wiki_chunk = _make_chunk(
+            text="From Wikipedia",
+            source_name="wikipedia",
+            embedding=_random_embedding(5.0),
+        )
+        reddit_chunk = _make_chunk(
+            text="From Reddit", source_name="reddit", embedding=_random_embedding(5.1)
+        )
 
         store.upsert_chunks("filter_test", [wiki_chunk, reddit_chunk])
 
@@ -185,7 +197,9 @@ class TestMetadataFiltering:
 
     def test_citation_id_format(self, store: VectorStore):
         emb = _random_embedding(8.0)
-        chunk = _make_chunk(text="Citation test", source_name="hackernews", embedding=emb)
+        chunk = _make_chunk(
+            text="Citation test", source_name="hackernews", embedding=emb
+        )
         store.upsert_chunks("cite", [chunk])
 
         results = store.query("cite", query_embedding=emb)
@@ -282,8 +296,12 @@ class TestNamingConvention:
         session_emb = _random_embedding(30.0)
         global_emb = _random_embedding(31.0)
 
-        store.upsert_session_chunks("isolated", [_make_chunk(text="Session only", embedding=session_emb)])
-        store.upsert_global_chunks([_make_chunk(text="Global only", embedding=global_emb)])
+        store.upsert_session_chunks(
+            "isolated", [_make_chunk(text="Session only", embedding=session_emb)]
+        )
+        store.upsert_global_chunks(
+            [_make_chunk(text="Global only", embedding=global_emb)]
+        )
 
         session_results = store.query_session("isolated", query_embedding=session_emb)
         global_results = store.query_global(query_embedding=global_emb)
@@ -297,7 +315,12 @@ class TestNamingConvention:
         emb = _random_embedding(32.0)
         store.upsert_session_chunks("del-me", [_make_chunk(embedding=emb)])
         assert store.delete_session("del-me") is True
-        assert store.get_collection_stats(VectorStore.collection_name_for_session("del-me")) is None
+        assert (
+            store.get_collection_stats(
+                VectorStore.collection_name_for_session("del-me")
+            )
+            is None
+        )
 
 
 # ======================================================================
@@ -337,10 +360,17 @@ class TestPersistence:
         emb_b = _random_embedding(43.0)
 
         store_1 = VectorStore(persist_dir=persist_dir)
-        store_1.upsert_session_chunks("sess-a", [_make_chunk(text="A", embedding=emb_a)])
+        store_1.upsert_session_chunks(
+            "sess-a", [_make_chunk(text="A", embedding=emb_a)]
+        )
         store_1.upsert_global_chunks([_make_chunk(text="B", embedding=emb_b)])
         del store_1
 
         store_2 = VectorStore(persist_dir=persist_dir)
-        assert store_2.get_collection_stats(VectorStore.collection_name_for_session("sess-a")).count == 1
+        assert (
+            store_2.get_collection_stats(
+                VectorStore.collection_name_for_session("sess-a")
+            ).count
+            == 1
+        )
         assert store_2.get_collection_stats(GLOBAL_COLLECTION_NAME).count == 1

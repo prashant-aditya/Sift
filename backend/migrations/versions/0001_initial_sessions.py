@@ -34,7 +34,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
     )
     op.create_index("ix_research_sessions_status", "research_sessions", ["status"])
-    op.create_index("ix_research_sessions_updated_at", "research_sessions", ["updated_at"])
+    op.create_index(
+        "ix_research_sessions_updated_at", "research_sessions", ["updated_at"]
+    )
     op.create_index("ix_research_sessions_user_id", "research_sessions", ["user_id"])
 
     op.create_table(
@@ -96,4 +98,3 @@ def downgrade() -> None:
 
     op.drop_index("ix_users_external_id", table_name="users")
     op.drop_table("users")
-

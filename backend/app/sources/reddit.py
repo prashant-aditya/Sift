@@ -59,7 +59,7 @@ def _extract_top_comments(payload: object, max_comments: int = 5) -> list[str]:
     comments_listing = payload[1]
     if not isinstance(comments_listing, dict):
         return []
-    children = (((comments_listing.get("data") or {}).get("children") or []))
+    children = (comments_listing.get("data") or {}).get("children") or []
     if not isinstance(children, list):
         return []
 
@@ -94,10 +94,14 @@ class RedditAdapter(SourceAdapter):
     def is_available(self) -> bool:
         return True
 
-    async def search(self, query: str, max_results: Optional[int] = None) -> list[SourceResult]:
+    async def search(
+        self, query: str, max_results: Optional[int] = None
+    ) -> list[SourceResult]:
         limit = max_results or self.max_results
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, headers=_REDDIT_HEADERS) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_seconds, headers=_REDDIT_HEADERS
+            ) as client:
                 await _reddit_throttle()
                 resp = await client.get(
                     _REDDIT_SEARCH,
@@ -127,19 +131,25 @@ class RedditAdapter(SourceAdapter):
                     )
                 resp.raise_for_status()
                 payload = resp.json()
-                children = (((payload or {}).get("data") or {}).get("children") or [])
+                children = ((payload or {}).get("data") or {}).get("children") or []
                 if not isinstance(children, list):
                     return []
 
                 results: list[SourceResult] = []
                 for child in children[:limit]:
-                    data = (child or {}).get("data") if isinstance(child, dict) else None
+                    data = (
+                        (child or {}).get("data") if isinstance(child, dict) else None
+                    )
                     if not isinstance(data, dict):
                         continue
 
                     title = str(data.get("title") or "")
                     permalink = str(data.get("permalink") or "")
-                    url = f"https://www.reddit.com{permalink}" if permalink else str(data.get("url") or "")
+                    url = (
+                        f"https://www.reddit.com{permalink}"
+                        if permalink
+                        else str(data.get("url") or "")
+                    )
                     subreddit = str(data.get("subreddit") or "")
                     score = int(data.get("score") or 0)
                     num_comments = int(data.get("num_comments") or 0)
@@ -160,15 +170,21 @@ class RedditAdapter(SourceAdapter):
                                 params={"raw_json": 1, "sort": "top", "limit": 20},
                             )
                             if comments_resp.status_code == 429:
-                                retry_after = float(comments_resp.headers.get("Retry-After") or 2)
-                                await sleep(max(retry_after, _REDDIT_MIN_INTERVAL_SECONDS))
+                                retry_after = float(
+                                    comments_resp.headers.get("Retry-After") or 2
+                                )
+                                await sleep(
+                                    max(retry_after, _REDDIT_MIN_INTERVAL_SECONDS)
+                                )
                                 await _reddit_throttle()
                                 comments_resp = await client.get(
                                     comments_endpoint,
                                     params={"raw_json": 1, "sort": "top", "limit": 20},
                                 )
                             if comments_resp.status_code == 200:
-                                top_comments = _extract_top_comments(comments_resp.json(), max_comments=5)
+                                top_comments = _extract_top_comments(
+                                    comments_resp.json(), max_comments=5
+                                )
                                 if top_comments:
                                     comments_text = "\n---\n".join(top_comments)
                         except Exception:
@@ -177,7 +193,11 @@ class RedditAdapter(SourceAdapter):
                     if comments_text:
                         raw_content_parts.append(comments_text)
 
-                    raw_content = "\n\nTop comments:\n".join(raw_content_parts) if raw_content_parts else None
+                    raw_content = (
+                        "\n\nTop comments:\n".join(raw_content_parts)
+                        if raw_content_parts
+                        else None
+                    )
 
                     results.append(
                         SourceResult(
@@ -202,4 +222,3 @@ class RedditAdapter(SourceAdapter):
         except Exception:
             logger.exception("Reddit search failed for query: %s", query)
             return []
-

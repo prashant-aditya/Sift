@@ -13,7 +13,9 @@ class CircuitOpenError(RuntimeError):
     def __init__(self, source_name: str, retry_after_seconds: int) -> None:
         self.source_name = source_name
         self.retry_after_seconds = int(max(0, retry_after_seconds))
-        super().__init__(f"circuit_open source={source_name} retry_after={self.retry_after_seconds}s")
+        super().__init__(
+            f"circuit_open source={source_name} retry_after={self.retry_after_seconds}s"
+        )
 
 
 @dataclass(frozen=True)
@@ -56,12 +58,20 @@ class CircuitBreaker:
         self.source_name = source_name.strip().lower()
         self.redis = redis
         cfg = config or CircuitBreakerConfig()
-        self.failure_threshold = int(failure_threshold if failure_threshold is not None else cfg.failure_threshold)
+        self.failure_threshold = int(
+            failure_threshold
+            if failure_threshold is not None
+            else cfg.failure_threshold
+        )
         self.failure_window_seconds = int(
             failure_window if failure_window is not None else cfg.failure_window_seconds
         )
-        self.cooldown_seconds = int(cooldown if cooldown is not None else cfg.cooldown_seconds)
-        self._prefix = (key_prefix if key_prefix is not None else cfg.key_prefix).strip(":")
+        self.cooldown_seconds = int(
+            cooldown if cooldown is not None else cfg.cooldown_seconds
+        )
+        self._prefix = (key_prefix if key_prefix is not None else cfg.key_prefix).strip(
+            ":"
+        )
         self._now = time_fn
 
     @property
@@ -131,7 +141,9 @@ class CircuitBreaker:
 
         # Use a small transaction to avoid interleaving updates across workers.
         async with self.redis.pipeline(transaction=True) as pipe:
-            last_fail_raw, state_raw, failures_raw = await pipe.get(last_fail_key).get(state_key).get(failures_key).execute()
+            last_fail_raw, state_raw, failures_raw = (
+                await pipe.get(last_fail_key).get(state_key).get(failures_key).execute()
+            )
 
         try:
             last_fail = float(last_fail_raw) if last_fail_raw is not None else None
@@ -186,4 +198,3 @@ class CircuitBreaker:
 
         # CLOSED: keep it closed and reset failures for good measure.
         await self.redis.set(self._k("failures"), "0")
-

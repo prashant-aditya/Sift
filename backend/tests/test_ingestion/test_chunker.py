@@ -54,7 +54,10 @@ class TestChunkSizes:
 
     def test_respects_sentence_separator(self):
         chunker = _make_chunker(chunk_size=20, chunk_overlap=5)
-        sentences = [f"Sentence number {i} with extra words to fill up tokens." for i in range(10)]
+        sentences = [
+            f"Sentence number {i} with extra words to fill up tokens."
+            for i in range(10)
+        ]
         text = " ".join(sentences)
         chunks = chunker.chunk(text, **CHUNK_META)
         assert len(chunks) >= 2
@@ -71,9 +74,7 @@ class TestChunkOverlap:
                 prev_words = set(chunks[i - 1].text.split())
                 curr_words = set(chunks[i].text.split())
                 overlap = prev_words & curr_words
-                assert len(overlap) > 0, (
-                    f"Chunks {i-1} and {i} share no words"
-                )
+                assert len(overlap) > 0, f"Chunks {i - 1} and {i} share no words"
 
 
 class TestMetadataPreservation:

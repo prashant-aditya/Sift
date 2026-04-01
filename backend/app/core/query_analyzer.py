@@ -44,13 +44,17 @@ class QueryAnalyzer:
         settings = get_settings()
         self._provider = (settings.llm_provider or "google").lower()
         self._api_key = api_key or (
-            settings.nvidia_api_key if self._provider == "nvidia" else settings.google_api_key
+            settings.nvidia_api_key
+            if self._provider == "nvidia"
+            else settings.google_api_key
         )
         self._model = model or settings.llm_model
         self._nvidia_base_url = settings.nvidia_base_url.rstrip("/")
 
         # Use the async client surface for FastAPI usage.
-        self._client = genai.Client(api_key=self._api_key) if self._provider != "nvidia" else None
+        self._client = (
+            genai.Client(api_key=self._api_key) if self._provider != "nvidia" else None
+        )
 
     async def decompose(self, query: str) -> list[str]:
         """Break *query* into a list of focused sub-queries.
@@ -97,7 +101,11 @@ class QueryAnalyzer:
             resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()
-            return ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+            return (
+                ((data.get("choices") or [{}])[0].get("message") or {})
+                .get("content", "")
+                .strip()
+            )
 
     @staticmethod
     def _parse_response(raw: str, *, original_query: str) -> list[str]:
@@ -126,7 +134,7 @@ class QueryAnalyzer:
             for line in raw.splitlines()
             if line.strip()
         ]
-        lines = [l for l in lines if l]
+        lines = [line for line in lines if line]
         if lines:
             return lines
 

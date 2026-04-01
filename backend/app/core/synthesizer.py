@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, Optional
+from typing import Optional
 
 import httpx
 from pydantic import BaseModel
@@ -68,11 +68,15 @@ class Synthesizer:
         settings = get_settings()
         self._provider = (settings.llm_provider or "google").lower()
         self._api_key = api_key or (
-            settings.nvidia_api_key if self._provider == "nvidia" else settings.google_api_key
+            settings.nvidia_api_key
+            if self._provider == "nvidia"
+            else settings.google_api_key
         )
         self._model = model or settings.llm_model
         self._nvidia_base_url = settings.nvidia_base_url.rstrip("/")
-        self._client = genai.Client(api_key=self._api_key) if self._provider != "nvidia" else None
+        self._client = (
+            genai.Client(api_key=self._api_key) if self._provider != "nvidia" else None
+        )
 
     async def synthesize(
         self,
@@ -135,7 +139,9 @@ class Synthesizer:
         }
 
         async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            async with client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
                     if not line:
@@ -146,6 +152,7 @@ class Synthesizer:
                     if data_str == "[DONE]":
                         break
                     import json
+
                     try:
                         data = json.loads(data_str)
                     except Exception:
@@ -213,4 +220,6 @@ def _build_user_message(query: str, chunks: list[RetrievedChunk]) -> str:
 
     sources_text = "\n\n".join(source_blocks)
 
-    return SYNTHESIS_USER_MESSAGE_TEMPLATE.format(sources_text=sources_text, query=query)
+    return SYNTHESIS_USER_MESSAGE_TEMPLATE.format(
+        sources_text=sources_text, query=query
+    )

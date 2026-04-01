@@ -97,9 +97,7 @@ class HackerNewsAdapter(SourceAdapter):
                 return None
             children = resp.json().get("children", [])
             comments_with_text = [c for c in children if c.get("text")]
-            comments_with_text.sort(
-                key=lambda c: c.get("points") or 0, reverse=True
-            )
+            comments_with_text.sort(key=lambda c: c.get("points") or 0, reverse=True)
             texts = [c["text"] for c in comments_with_text[:5]]
             return "\n---\n".join(texts) if texts else None
         except Exception:

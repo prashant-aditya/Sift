@@ -115,13 +115,21 @@ class TokenBucketRateLimiter:
             _ACQUIRE_LUA,
             numkeys=2,
             keys=[tokens_key, last_key],
-            args=[now, float(lim.tokens_per_second), float(lim.capacity), float(cost), ttl],
+            args=[
+                now,
+                float(lim.tokens_per_second),
+                float(lim.capacity),
+                float(cost),
+                ttl,
+            ],
         )
         # redis-py returns a list of ints/strings; tolerate both.
         acquired = int(res[0]) == 1  # type: ignore[index]
         return acquired
 
-    async def acquire(self, source: str, *, timeout: float = 10.0, cost: float = 1.0) -> bool:
+    async def acquire(
+        self, source: str, *, timeout: float = 10.0, cost: float = 1.0
+    ) -> bool:
         """Acquire one token (cost) for a given source within timeout."""
         deadline = self._now() + float(timeout)
         while True:
@@ -131,4 +139,3 @@ class TokenBucketRateLimiter:
                 return False
             # Short polling interval; Redis state is shared across workers.
             await self._sleep(0.05)
-

@@ -12,7 +12,9 @@ from app.core.log_context import set_request_id
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        request_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex[:12]}"
+        request_id = (
+            request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex[:12]}"
+        )
         set_request_id(request_id)
         start = time.perf_counter()
         try:
@@ -26,4 +28,3 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         # Store for any downstream tools/clients; not used in logging directly.
         response.headers["x-response-time-ms"] = f"{duration_ms:.1f}"
         return response
-

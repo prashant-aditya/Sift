@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Awaitable, Callable, TypeVar
 
 try:
     from typing import ParamSpec  # type: ignore[attr-defined]
@@ -28,7 +28,10 @@ class RetryConfig:
     max_retries: int = 2
     backoff_base: float = 1.0
     jitter_ratio: float = 0.2  # +/- 20%
-    retryable_exceptions: tuple[type[BaseException], ...] = (TimeoutError, ConnectionError)
+    retryable_exceptions: tuple[type[BaseException], ...] = (
+        TimeoutError,
+        ConnectionError,
+    )
 
 
 def with_retry(
@@ -36,7 +39,10 @@ def with_retry(
     max_retries: int = 2,
     backoff_base: float = 1.0,
     jitter_ratio: float = 0.2,
-    retryable_exceptions: tuple[type[BaseException], ...] = (TimeoutError, ConnectionError),
+    retryable_exceptions: tuple[type[BaseException], ...] = (
+        TimeoutError,
+        ConnectionError,
+    ),
     sleep_fn: Callable[[float], Awaitable[None]] = asyncio.sleep,
     random_fn: Callable[[float, float], float] = random.uniform,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
@@ -79,4 +85,3 @@ def with_retry(
         return wrapped
 
     return decorator
-
