@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,9 +28,7 @@ class TestDuckDuckGoValidResponse:
         mock_ddgs = MagicMock()
         mock_ddgs.text.return_value = _make_raw_results(3)
 
-        with patch(
-            "app.sources.duckduckgo.DDGS", return_value=mock_ddgs
-        ):
+        with patch("app.sources.duckduckgo.DDGS", return_value=mock_ddgs):
             results = await adapter.search("python fastapi")
 
         assert len(results) == 3
@@ -43,9 +40,7 @@ class TestDuckDuckGoValidResponse:
         mock_ddgs = MagicMock()
         mock_ddgs.text.return_value = _make_raw_results(2)
 
-        with patch(
-            "app.sources.duckduckgo.DDGS", return_value=mock_ddgs
-        ):
+        with patch("app.sources.duckduckgo.DDGS", return_value=mock_ddgs):
             results = await adapter.search("test", max_results=2)
 
         mock_ddgs.text.assert_called_once_with("test", max_results=2)
@@ -57,9 +52,7 @@ class TestDuckDuckGoEmptyResults:
         mock_ddgs = MagicMock()
         mock_ddgs.text.return_value = []
 
-        with patch(
-            "app.sources.duckduckgo.DDGS", return_value=mock_ddgs
-        ):
+        with patch("app.sources.duckduckgo.DDGS", return_value=mock_ddgs):
             results = await adapter.search("obscure query xyz123")
 
         assert results == []
@@ -71,15 +64,14 @@ class TestDuckDuckGoTimeout:
 
         def _slow_search(*_a, **_kw):
             import time
+
             time.sleep(5)
             return []
 
         mock_ddgs = MagicMock()
         mock_ddgs.text.side_effect = _slow_search
 
-        with patch(
-            "app.sources.duckduckgo.DDGS", return_value=mock_ddgs
-        ):
+        with patch("app.sources.duckduckgo.DDGS", return_value=mock_ddgs):
             results = await adapter.search("timeout query")
 
         assert results == []
@@ -90,9 +82,7 @@ class TestDuckDuckGoMalformedResponse:
         mock_ddgs = MagicMock()
         mock_ddgs.text.return_value = [{"unexpected": "data"}]
 
-        with patch(
-            "app.sources.duckduckgo.DDGS", return_value=mock_ddgs
-        ):
+        with patch("app.sources.duckduckgo.DDGS", return_value=mock_ddgs):
             results = await adapter.search("malformed")
 
         assert len(results) == 1
@@ -103,9 +93,7 @@ class TestDuckDuckGoMalformedResponse:
         mock_ddgs = MagicMock()
         mock_ddgs.text.side_effect = RuntimeError("API broke")
 
-        with patch(
-            "app.sources.duckduckgo.DDGS", return_value=mock_ddgs
-        ):
+        with patch("app.sources.duckduckgo.DDGS", return_value=mock_ddgs):
             results = await adapter.search("error query")
 
         assert results == []

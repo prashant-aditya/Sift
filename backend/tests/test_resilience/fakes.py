@@ -120,4 +120,3 @@ class _FakePipeline:
             out.append(await fn(*cmd.args, **cmd.kwargs))
         self._cmds.clear()
         return out
-

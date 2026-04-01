@@ -81,7 +81,9 @@ class TestExtractFromText:
 class TestExtractFromSnippet:
     def test_returns_cleaned_snippet(self):
         snippet = "  This is a search snippet.  "
-        result = ContentExtractor.extract_from_snippet(snippet, url="https://example.com")
+        result = ContentExtractor.extract_from_snippet(
+            snippet, url="https://example.com"
+        )
         assert result == "This is a search snippet."
 
     def test_empty_snippet(self):

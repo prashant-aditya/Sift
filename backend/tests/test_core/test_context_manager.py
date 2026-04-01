@@ -106,11 +106,16 @@ class TestContextManager:
         from sqlalchemy import select
 
         turns = (
-            await db.execute(
-                select(ResearchTurn)
-                .where(ResearchTurn.session_id == UUID(session_id))
-                .order_by(ResearchTurn.created_at.asc())
+            (
+                await db.execute(
+                    select(ResearchTurn)
+                    .where(ResearchTurn.session_id == UUID(session_id))
+                    .order_by(ResearchTurn.created_at.asc())
+                )
             )
-        ).scalars().all()
-        assert any((t.compressed_context or "").startswith("SUMMARY:") for t in turns[:-2])
-
+            .scalars()
+            .all()
+        )
+        assert any(
+            (t.compressed_context or "").startswith("SUMMARY:") for t in turns[:-2]
+        )

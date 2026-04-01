@@ -40,4 +40,3 @@ async def test_retry_gives_up_after_max_retries():
 
     with pytest.raises(RetryError):
         await always_fail()
-

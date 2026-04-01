@@ -25,9 +25,7 @@ def _summary_response(title: str) -> dict:
         "title": title,
         "description": f"Short description of {title}",
         "extract": f"Full extract text for {title}. This is the article content.",
-        "content_urls": {
-            "desktop": {"page": f"https://en.wikipedia.org/wiki/{title}"}
-        },
+        "content_urls": {"desktop": {"page": f"https://en.wikipedia.org/wiki/{title}"}},
     }
 
 
@@ -35,10 +33,14 @@ class TestWikipediaValidResponse:
     @respx.mock
     async def test_returns_source_results(self, adapter: WikipediaAdapter):
         respx.get(_SEARCH_API).mock(
-            return_value=httpx.Response(200, json=_search_response(["Python_(programming_language)"]))
+            return_value=httpx.Response(
+                200, json=_search_response(["Python_(programming_language)"])
+            )
         )
         respx.get(f"{_SUMMARY_API}/Python_(programming_language)").mock(
-            return_value=httpx.Response(200, json=_summary_response("Python (programming language)"))
+            return_value=httpx.Response(
+                200, json=_summary_response("Python (programming language)")
+            )
         )
 
         results = await adapter.search("python programming")
@@ -97,14 +99,14 @@ class TestWikipediaMalformedResponse:
     @respx.mock
     async def test_summary_404_skipped(self, adapter: WikipediaAdapter):
         respx.get(_SEARCH_API).mock(
-            return_value=httpx.Response(200, json=_search_response(["GoodArticle", "Missing"]))
+            return_value=httpx.Response(
+                200, json=_search_response(["GoodArticle", "Missing"])
+            )
         )
         respx.get(f"{_SUMMARY_API}/GoodArticle").mock(
             return_value=httpx.Response(200, json=_summary_response("GoodArticle"))
         )
-        respx.get(f"{_SUMMARY_API}/Missing").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get(f"{_SUMMARY_API}/Missing").mock(return_value=httpx.Response(404))
 
         results = await adapter.search("mixed results")
         assert len(results) == 1

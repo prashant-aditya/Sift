@@ -57,7 +57,9 @@ class ContextManager:
 
         return await self._compress_older_turns(turns, db)
 
-    async def _get_session_turns(self, sid: UUID, db: AsyncSession) -> list[ResearchTurn]:
+    async def _get_session_turns(
+        self, sid: UUID, db: AsyncSession
+    ) -> list[ResearchTurn]:
         stmt = (
             select(ResearchTurn)
             .where(ResearchTurn.session_id == sid)
@@ -79,7 +81,9 @@ class ContextManager:
             )
         return "\n\n".join(blocks)
 
-    async def _compress_older_turns(self, turns: list[ResearchTurn], db: AsyncSession) -> str:
+    async def _compress_older_turns(
+        self, turns: list[ResearchTurn], db: AsyncSession
+    ) -> str:
         if len(turns) <= 2:
             # Nothing to keep aside from the latest turns; fall back to truncation.
             return self._format_full_context(turns[-2:])
@@ -87,7 +91,9 @@ class ContextManager:
         recent = turns[-2:]
         older = turns[:-2]
 
-        cached_turn = next((t for t in reversed(older) if (t.compressed_context or "").strip()), None)
+        cached_turn = next(
+            (t for t in reversed(older) if (t.compressed_context or "").strip()), None
+        )
         if cached_turn is not None:
             summary = str(cached_turn.compressed_context or "").strip()
         else:
@@ -196,4 +202,3 @@ def _clip_to_token_budget(text: str, token_budget: int) -> str:
     if len(t) <= char_budget:
         return t
     return t[: max(0, char_budget - 3)].rstrip() + "..."
-

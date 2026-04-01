@@ -54,4 +54,3 @@ class TestMinHashDeduplicator:
         kept = d.deduplicate(items)
         assert len(kept) == 1
         assert kept[0].source_name == "wikipedia"
-

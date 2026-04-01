@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
 import pytest_asyncio
+import jwt
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -59,12 +60,14 @@ class _FakeAdapter(SourceAdapter):
 
 
 @pytest_asyncio.fixture()
-async def sessions_app(tmp_path):
+async def sessions_app(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
     db_url = f"sqlite+aiosqlite:///{db_path}"
     app = FastAPI()
     app.include_router(research_router)
     app.include_router(sessions_router)
+
+    monkeypatch.setenv("SUPABASE_JWT_SECRET", "test-secret")
 
     class _S:
         database_url = db_url
@@ -108,7 +111,9 @@ async def sessions_app(tmp_path):
         def upsert_chunks(self, *_a, **_kw):
             return 1
 
-        def query_session(self, session_id: str, query_embedding, n_results: int = 10, where=None):
+        def query_session(
+            self, session_id: str, query_embedding, n_results: int = 10, where=None
+        ):
             return [
                 RetrievedChunk(
                     chunk=Chunk(
@@ -147,6 +152,17 @@ async def sessions_app(tmp_path):
     await engine.dispose()
 
 
+def _auth_headers(
+    *, sub: str = "user-123", secret: str = "test-secret"
+) -> dict[str, str]:
+    token = jwt.encode(
+        {"sub": sub, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        secret,
+        algorithm="HS256",
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
 async def _init_db(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -158,18 +174,21 @@ class TestSessionsCRUD:
         async with AsyncClient(
             transport=ASGITransport(app=sessions_app), base_url="http://test"
         ) as client:
-            resp = await client.post("/api/v1/research", json={"query": "What is Python?"})
+            headers = _auth_headers()
+            resp = await client.post(
+                "/api/v1/research", json={"query": "What is Python?"}, headers=headers
+            )
             assert resp.status_code == 200
             events = _parse_sse(resp.text)
             complete = next(e for e in events if e["event"] == "complete")
             session_id = UUID(str(complete["data"]["session_id"]))
 
-            listed = await client.get("/api/v1/sessions")
+            listed = await client.get("/api/v1/sessions", headers=headers)
             assert listed.status_code == 200
             ids = [UUID(item["id"]) for item in listed.json()["data"]]
             assert session_id in ids
 
-            got = await client.get(f"/api/v1/sessions/{session_id}")
+            got = await client.get(f"/api/v1/sessions/{session_id}", headers=headers)
             assert got.status_code == 200
             body = got.json()
             assert UUID(body["id"]) == session_id
@@ -182,24 +201,39 @@ class TestSessionsCRUD:
         async with AsyncClient(
             transport=ASGITransport(app=sessions_app), base_url="http://test"
         ) as client:
-            resp = await client.post("/api/v1/research", json={"query": "Topic A"})
+            headers = _auth_headers()
+            resp = await client.post(
+                "/api/v1/research", json={"query": "Topic A"}, headers=headers
+            )
             session_id = UUID(
-                str(next(e for e in _parse_sse(resp.text) if e["event"] == "complete")["data"]["session_id"])
+                str(
+                    next(e for e in _parse_sse(resp.text) if e["event"] == "complete")[
+                        "data"
+                    ]["session_id"]
+                )
             )
 
-            renamed = await client.patch(f"/api/v1/sessions/{session_id}", json={"name": "My Session"})
+            renamed = await client.patch(
+                f"/api/v1/sessions/{session_id}",
+                json={"name": "My Session"},
+                headers=headers,
+            )
             assert renamed.status_code == 200
             assert renamed.json()["name"] == "My Session"
 
-            archived = await client.delete(f"/api/v1/sessions/{session_id}")
+            archived = await client.delete(
+                f"/api/v1/sessions/{session_id}", headers=headers
+            )
             assert archived.status_code == 204
 
-            listed = await client.get("/api/v1/sessions")
+            listed = await client.get("/api/v1/sessions", headers=headers)
             assert listed.status_code == 200
             ids = [UUID(item["id"]) for item in listed.json()["data"]]
             assert session_id not in ids
 
-            listed_all = await client.get("/api/v1/sessions?include_archived=true")
+            listed_all = await client.get(
+                "/api/v1/sessions?include_archived=true", headers=headers
+            )
             ids_all = [UUID(item["id"]) for item in listed_all.json()["data"]]
             assert session_id in ids_all
 
@@ -208,17 +242,19 @@ class TestSessionsCRUD:
         async with AsyncClient(
             transport=ASGITransport(app=sessions_app), base_url="http://test"
         ) as client:
+            headers = _auth_headers()
             for i in range(5):
-                resp = await client.post("/api/v1/research", json={"query": f"Q{i} here"})
+                resp = await client.post(
+                    "/api/v1/research", json={"query": f"Q{i} here"}, headers=headers
+                )
                 assert resp.status_code == 200
 
-            p1 = await client.get("/api/v1/sessions?page=1&per_page=2")
+            p1 = await client.get("/api/v1/sessions?page=1&per_page=2", headers=headers)
             assert p1.status_code == 200
             assert len(p1.json()["data"]) == 2
             assert p1.json()["meta"]["page"] == 1
             assert p1.json()["meta"]["per_page"] == 2
 
-            p2 = await client.get("/api/v1/sessions?page=2&per_page=2")
+            p2 = await client.get("/api/v1/sessions?page=2&per_page=2", headers=headers)
             assert p2.status_code == 200
             assert len(p2.json()["data"]) == 2
-

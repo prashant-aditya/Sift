@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import pytest
 import pytest_asyncio
+import jwt
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -64,9 +65,11 @@ async def _init_db(engine: AsyncEngine) -> None:
 
 
 @pytest_asyncio.fixture()
-async def app_with_db(tmp_path):
+async def app_with_db(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
     db_url = f"sqlite+aiosqlite:///{db_path}"
+
+    monkeypatch.setenv("SUPABASE_JWT_SECRET", "test-secret")
 
     app = FastAPI()
     app.include_router(research_router)
@@ -116,7 +119,9 @@ async def app_with_db(tmp_path):
         def upsert_chunks(self, *_a, **_kw):
             return 1
 
-        def query_session(self, session_id: str, query_embedding, n_results: int = 10, where=None):
+        def query_session(
+            self, session_id: str, query_embedding, n_results: int = 10, where=None
+        ):
             self.query_session_calls.append(session_id)
             return [
                 RetrievedChunk(
@@ -155,10 +160,23 @@ async def app_with_db(tmp_path):
     async def _fake_summary(_t: str) -> str:
         return "SUMMARY"
 
-    app.state.context_manager = ContextManager(summarizer=_fake_summary, max_context_tokens=10_000)
+    app.state.context_manager = ContextManager(
+        summarizer=_fake_summary, max_context_tokens=10_000
+    )
 
     yield app
     await engine.dispose()
+
+
+def _auth_headers(
+    *, sub: str = "user-123", secret: str = "test-secret"
+) -> dict[str, str]:
+    token = jwt.encode(
+        {"sub": sub, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        secret,
+        algorithm="HS256",
+    )
+    return {"Authorization": f"Bearer {token}"}
 
 
 class TestFollowupEndpoint:
@@ -167,22 +185,30 @@ class TestFollowupEndpoint:
         async with AsyncClient(
             transport=ASGITransport(app=app_with_db), base_url="http://test"
         ) as client:
-            resp = await client.post("/api/v1/research", json={"query": "Topic A"})
+            headers = _auth_headers()
+            resp = await client.post(
+                "/api/v1/research", json={"query": "Topic A"}, headers=headers
+            )
             assert resp.status_code == 200
             session_id = UUID(
-                str(next(e for e in _parse_sse(resp.text) if e["event"] == "complete")["data"]["session_id"])
+                str(
+                    next(e for e in _parse_sse(resp.text) if e["event"] == "complete")[
+                        "data"
+                    ]["session_id"]
+                )
             )
 
             follow = await client.post(
                 f"/api/v1/research/{session_id}/followup",
                 json={"query": "Follow-up Q"},
+                headers=headers,
             )
             assert follow.status_code == 200
             follow_events = _parse_sse(follow.text)
             complete = next(e for e in follow_events if e["event"] == "complete")
             assert UUID(str(complete["data"]["session_id"])) == session_id
 
-            got = await client.get(f"/api/v1/sessions/{session_id}")
+            got = await client.get(f"/api/v1/sessions/{session_id}", headers=headers)
             assert got.status_code == 200
             body = got.json()
             assert len(body["turns"]) == 2
@@ -190,6 +216,7 @@ class TestFollowupEndpoint:
 
         # Dense retrieval must have been queried against the same session collection.
         vs = app_with_db.state.vector_store
-        assert vs.query_session_calls, "Expected dense retrieval to query the session collection"
+        assert vs.query_session_calls, (
+            "Expected dense retrieval to query the session collection"
+        )
         assert vs.query_session_calls[-1] == str(session_id)
-

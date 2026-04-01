@@ -55,4 +55,3 @@ class EmbeddingCache:
 
     def stats(self) -> EmbeddingCacheStats:
         return EmbeddingCacheStats(hits=self._hits, misses=self._misses)
-

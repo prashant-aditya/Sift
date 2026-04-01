@@ -23,3 +23,5 @@ datasketch==1.9.0
 celery[redis]==5.5.3
 redis==6.4.0
 cachetools==5.5.2
+PyJWT==2.10.1
+structlog==25.5.0

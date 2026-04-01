@@ -83,7 +83,9 @@ class VectorStore:
             name=name,
             metadata=collection_metadata,
         )
-        logger.debug("get_or_create_collection name=%s count=%d", name, collection.count())
+        logger.debug(
+            "get_or_create_collection name=%s count=%d", name, collection.count()
+        )
         return collection
 
     # ------------------------------------------------------------------
@@ -310,6 +312,8 @@ def _parse_query_results(results: dict[str, Any]) -> list[RetrievedChunk]:
 
         citation_id = f"{meta.get('source_name', 'unknown')}:{chunk_id[:8]}"
 
-        retrieved.append(RetrievedChunk(chunk=chunk, score=score, citation_id=citation_id))
+        retrieved.append(
+            RetrievedChunk(chunk=chunk, score=score, citation_id=citation_id)
+        )
 
     return retrieved

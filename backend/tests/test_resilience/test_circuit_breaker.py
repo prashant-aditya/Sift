@@ -104,4 +104,3 @@ async def test_circuit_breaker_failure_in_half_open_reopens_immediately():
     with pytest.raises(CircuitOpenError):
         async with cb:
             pass
-

@@ -119,7 +119,9 @@ class ResearchOrchestrator:
             dense=DenseRetriever(vector_store=vector_store, embedder=embedder)
         )
 
-    async def _persist_session(self, session_id: str) -> None:
+    async def _persist_session(
+        self, session_id: str, *, user_id: UUID | None = None
+    ) -> None:
         if self._db_sessionmaker is None:
             return
         try:
@@ -129,9 +131,16 @@ class ResearchOrchestrator:
 
             sid = UUID(session_id)
             async with self._db_sessionmaker() as db:
-                existing = (await db.execute(select(ResearchSession).where(ResearchSession.id == sid))).scalar_one_or_none()
+                existing = (
+                    await db.execute(
+                        select(ResearchSession).where(ResearchSession.id == sid)
+                    )
+                ).scalar_one_or_none()
                 if existing is None:
-                    db.add(ResearchSession(id=sid))
+                    db.add(ResearchSession(id=sid, user_id=user_id))
+                    await db.commit()
+                elif user_id is not None and existing.user_id is None:
+                    existing.user_id = user_id
                     await db.commit()
         except Exception:
             logger.exception("Failed to persist research session")
@@ -140,6 +149,7 @@ class ResearchOrchestrator:
         self,
         *,
         session_id: str,
+        user_id: UUID | None = None,
         query: str,
         answer: str,
         citations: list[dict[str, Any]],
@@ -152,6 +162,19 @@ class ResearchOrchestrator:
 
             sid = UUID(session_id)
             async with self._db_sessionmaker() as db:
+                if user_id is not None:
+                    # Best-effort ownership attachment. If the session row does not
+                    # exist yet, it will be created by _persist_session().
+                    try:
+                        from app.db.models import ResearchSession
+
+                        session = await db.get(ResearchSession, sid)
+                        if session is not None and session.user_id is None:
+                            session.user_id = user_id
+                    except Exception:
+                        # Never block the request on a failed ownership update.
+                        pass
+
                 db.add(
                     ResearchTurn(
                         id=uuid.uuid4(),
@@ -172,6 +195,7 @@ class ResearchOrchestrator:
         session_id: str,
         query: str,
         augmented_query: str,
+        user_id: UUID | None = None,
         sources: Optional[list[str]] = None,
         depth: str = "standard",
     ) -> AsyncGenerator[dict[str, str], None]:
@@ -183,7 +207,7 @@ class ResearchOrchestrator:
         - Persists the turn with the *original* query, while using *augmented_query*
           for retrieval/synthesis.
         """
-        await self._persist_session(session_id)
+        await self._persist_session(session_id, user_id=user_id)
         async for ev in self._run_pipeline(
             session_id=session_id,
             query=query,
@@ -191,6 +215,7 @@ class ResearchOrchestrator:
             sources=sources,
             depth=depth,
             enable_cache=False,
+            user_id=user_id,
         ):
             yield ev
 
@@ -216,6 +241,8 @@ class ResearchOrchestrator:
         query: str,
         sources: Optional[list[str]] = None,
         depth: str = "standard",
+        *,
+        user_id: UUID | None = None,
     ) -> AsyncGenerator[dict[str, str], None]:
         """Execute the 7-step research pipeline as an SSE event stream.
 
@@ -233,7 +260,7 @@ class ResearchOrchestrator:
         7. Yield completion event with ``session_id`` and citations
         """
         session_id = str(uuid.uuid4())
-        await self._persist_session(session_id)
+        await self._persist_session(session_id, user_id=user_id)
         async for ev in self._run_pipeline(
             session_id=session_id,
             query=query,
@@ -241,6 +268,7 @@ class ResearchOrchestrator:
             sources=sources,
             depth=depth,
             enable_cache=True,
+            user_id=user_id,
         ):
             yield ev
 
@@ -253,6 +281,7 @@ class ResearchOrchestrator:
         sources: Optional[list[str]],
         depth: str,
         enable_cache: bool,
+        user_id: UUID | None,
     ) -> AsyncGenerator[dict[str, str], None]:
         config = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["standard"])
         query_hash = ResearchCache.hash_query(pipeline_query)
@@ -271,6 +300,7 @@ class ResearchOrchestrator:
                 cached_sources_used = int(cache_result.data.get("sources_used") or 0)
                 await self._persist_turn(
                     session_id=session_id,
+                    user_id=user_id,
                     query=query,
                     answer=cached_answer,
                     citations=cached_citations,
@@ -293,6 +323,7 @@ class ResearchOrchestrator:
                 cached_sources_used = int(cache_result.data.get("sources_used") or 0)
                 await self._persist_turn(
                     session_id=session_id,
+                    user_id=user_id,
                     query=query,
                     answer=cached_answer,
                     citations=cached_citations,
@@ -328,16 +359,20 @@ class ResearchOrchestrator:
         # --- Step 1: Analyze query → sub-queries ---
         yield _sse_event("status", {"phase": "decomposing", "session_id": session_id})
         sub_queries = await self._query_analyzer.decompose(pipeline_query)
-        yield _sse_event("status", {
-            "phase": "decomposed",
-            "sub_queries": sub_queries,
-        })
+        yield _sse_event(
+            "status",
+            {
+                "phase": "decomposed",
+                "sub_queries": sub_queries,
+            },
+        )
 
         # --- Step 2: Fan-out searches across sources ---
         adapters = self._resolve_adapters(sources)
         if not adapters:
             await self._persist_turn(
                 session_id=session_id,
+                user_id=user_id,
                 query=query,
                 answer="",
                 citations=[],
@@ -349,37 +384,55 @@ class ResearchOrchestrator:
                     "duration_ms": int((time.perf_counter() - start) * 1000),
                 },
             )
-            yield _sse_event("complete", {
-                "session_id": session_id,
-                "sources_used": 0,
-                "citations": [],
-                "errors": ["No available sources"],
-            })
+            yield _sse_event(
+                "complete",
+                {
+                    "session_id": session_id,
+                    "sources_used": 0,
+                    "citations": [],
+                    "errors": ["No available sources"],
+                },
+            )
             return
 
-        yield _sse_event("status", {
-            "phase": "searching",
-            "sources_active": len(adapters),
-            "sub_queries_count": len(sub_queries),
-        })
+        yield _sse_event(
+            "status",
+            {
+                "phase": "searching",
+                "sources_active": len(adapters),
+                "sub_queries_count": len(sub_queries),
+            },
+        )
 
-        flat_results, source_errors, chunks, source_counts, sources_used = await self._fan_out_searches(
+        (
+            flat_results,
+            source_errors,
+            chunks,
+            source_counts,
+            sources_used,
+        ) = await self._fan_out_searches(
             adapters,
             sub_queries,
             config["max_results_per_source"],
             session_id=session_id,
         )
 
-        counts_iter = (source_counts or dict(_aggregate_source_counts(flat_results))).items()
+        counts_iter = (
+            source_counts or dict(_aggregate_source_counts(flat_results))
+        ).items()
         for source_name, count in counts_iter:
-            yield _sse_event("source_complete", {
-                "source": source_name,
-                "results_count": count,
-            })
+            yield _sse_event(
+                "source_complete",
+                {
+                    "source": source_name,
+                    "results_count": count,
+                },
+            )
 
         if (sources_used or len(flat_results)) == 0:
             await self._persist_turn(
                 session_id=session_id,
+                user_id=user_id,
                 query=query,
                 answer="",
                 citations=[],
@@ -391,25 +444,32 @@ class ResearchOrchestrator:
                     "duration_ms": int((time.perf_counter() - start) * 1000),
                 },
             )
-            yield _sse_event("complete", {
-                "session_id": session_id,
-                "sources_used": 0,
-                "citations": [],
-                "errors": source_errors or None,
-            })
+            yield _sse_event(
+                "complete",
+                {
+                    "session_id": session_id,
+                    "sources_used": 0,
+                    "citations": [],
+                    "errors": source_errors or None,
+                },
+            )
             return
 
         # --- Step 3-4: Ingest + store (done locally or via Celery chord callback) ---
         if chunks is None:
-            yield _sse_event("status", {
-                "phase": "processing",
-                "results_count": sources_used or len(flat_results),
-            })
+            yield _sse_event(
+                "status",
+                {
+                    "phase": "processing",
+                    "results_count": sources_used or len(flat_results),
+                },
+            )
             chunks = await self._ingestion_pipeline.process(flat_results)
 
             if not chunks:
                 await self._persist_turn(
                     session_id=session_id,
+                    user_id=user_id,
                     query=query,
                     answer="",
                     citations=[],
@@ -421,25 +481,37 @@ class ResearchOrchestrator:
                         "duration_ms": int((time.perf_counter() - start) * 1000),
                     },
                 )
-                yield _sse_event("complete", {
-                    "session_id": session_id,
-                    "sources_used": len(flat_results),
-                    "citations": [],
-                })
+                yield _sse_event(
+                    "complete",
+                    {
+                        "session_id": session_id,
+                        "sources_used": len(flat_results),
+                        "citations": [],
+                    },
+                )
                 return
 
-            yield _sse_event("status", {"phase": "storing", "chunks_count": len(chunks)})
+            yield _sse_event(
+                "status", {"phase": "storing", "chunks_count": len(chunks)}
+            )
             collection_name = VectorStore.collection_name_for_session(session_id)
             upserted = await asyncio.to_thread(
-                self._vector_store.upsert_chunks, collection_name, chunks,
+                self._vector_store.upsert_chunks,
+                collection_name,
+                chunks,
             )
             logger.info("Stored %d chunks for session %s", upserted, session_id)
         else:
             yield _sse_event(
                 "status",
-                {"phase": "processing", "results_count": sources_used or len(flat_results)},
+                {
+                    "phase": "processing",
+                    "results_count": sources_used or len(flat_results),
+                },
             )
-            yield _sse_event("status", {"phase": "storing", "chunks_count": len(chunks)})
+            yield _sse_event(
+                "status", {"phase": "storing", "chunks_count": len(chunks)}
+            )
 
         # --- Step 5: Retrieve top-K via hybrid retrieval (BM25 + dense) ---
         yield _sse_event("status", {"phase": "retrieving"})
@@ -469,6 +541,7 @@ class ResearchOrchestrator:
         yield _sse_event("complete", complete_data)
         await self._persist_turn(
             session_id=session_id,
+            user_id=user_id,
             query=query,
             answer=full_answer,
             citations=citations,
@@ -534,7 +607,13 @@ class ResearchOrchestrator:
         max_results: int,
         *,
         session_id: str,
-    ) -> tuple[list[SourceResult], list[str], list[Chunk] | None, dict[str, int] | None, int | None]:
+    ) -> tuple[
+        list[SourceResult],
+        list[str],
+        list[Chunk] | None,
+        dict[str, int] | None,
+        int | None,
+    ]:
         """Search all sources concurrently, optionally via Celery chord.
 
         Returns:
@@ -574,7 +653,13 @@ class ResearchOrchestrator:
         sub_queries: list[str],
         max_results: int,
         session_id: str,
-    ) -> tuple[list[SourceResult], list[str], list[Chunk] | None, dict[str, int] | None, int | None]:
+    ) -> tuple[
+        list[SourceResult],
+        list[str],
+        list[Chunk] | None,
+        dict[str, int] | None,
+        int | None,
+    ]:
         """Dispatch source fan-out via Celery chord(group(...))(callback)."""
         from celery import chord
 
@@ -631,7 +716,9 @@ class ResearchOrchestrator:
         except Exception as exc:
             logger.error(
                 "Source '%s' failed for query '%s': %s",
-                adapter.name, query, exc,
+                adapter.name,
+                query,
+                exc,
             )
             return {"source": adapter.name, "results": [], "error": str(exc)}
 

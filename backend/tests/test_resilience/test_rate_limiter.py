@@ -53,4 +53,3 @@ async def test_rate_limiter_acquire_times_out_when_no_refill_occurs():
     )
 
     assert await rl.acquire("reddit", timeout=0.01) is False
-

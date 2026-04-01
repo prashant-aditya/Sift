@@ -70,7 +70,11 @@ def search_source(  # type: ignore[no-untyped-def]
         registry = _build_source_registry()
         adapter = registry.get(source_name)
         if adapter is None or not adapter.is_available():
-            return {"source": source_name, "results": [], "error": "source_not_available"}
+            return {
+                "source": source_name,
+                "results": [],
+                "error": "source_not_available",
+            }
 
         async def _run() -> tuple[list[SourceResult], str | None]:
             redis = None
@@ -108,11 +112,17 @@ def search_source(  # type: ignore[no-untyped-def]
                 try:
                     flat.extend(await _search_once(q))
                 except CircuitOpenError as exc:
-                    logger.warning("circuit open source=%s retry_after=%ss", source_name, exc.retry_after_seconds)
+                    logger.warning(
+                        "circuit open source=%s retry_after=%ss",
+                        source_name,
+                        exc.retry_after_seconds,
+                    )
                     error = "circuit_open"
                     break
                 except RetryError as exc:
-                    logger.warning("retries exhausted source=%s err=%s", source_name, str(exc))
+                    logger.warning(
+                        "retries exhausted source=%s err=%s", source_name, str(exc)
+                    )
                     raise
                 except Exception:
                     logger.exception("search failed source=%s query=%s", source_name, q)
@@ -157,7 +167,9 @@ def refresh_research(  # type: ignore[no-untyped-def]
 
     registry = _build_source_registry()
     if sources:
-        adapters = [a for a in (registry.get(s) for s in sources) if a and a.is_available()]
+        adapters = [
+            a for a in (registry.get(s) for s in sources) if a and a.is_available()
+        ]
     else:
         adapters = registry.get_available()
 
@@ -168,7 +180,9 @@ def refresh_research(  # type: ignore[no-untyped-def]
     )
     ingestion = IngestionPipeline(embedder=embedder)
     store = VectorStore()
-    retriever = HybridRetriever(dense=DenseRetriever(vector_store=store, embedder=embedder))
+    retriever = HybridRetriever(
+        dense=DenseRetriever(vector_store=store, embedder=embedder)
+    )
     synthesizer = Synthesizer()
 
     async def _run() -> dict[str, Any]:
@@ -181,15 +195,21 @@ def refresh_research(  # type: ignore[no-untyped-def]
                     results = await adapter.search(sq, max_results=5)
                     flat.extend(results)
                 except Exception:
-                    logger.exception("refresh_research search failed source=%s", adapter.name)
+                    logger.exception(
+                        "refresh_research search failed source=%s", adapter.name
+                    )
 
         if not flat:
-            await cache.set_research(query_hash, {"answer": "", "citations": [], "sources_used": 0})
+            await cache.set_research(
+                query_hash, {"answer": "", "citations": [], "sources_used": 0}
+            )
             return {"ok": True, "sources_used": 0}
 
         chunks = await ingestion.process(flat)
         if not chunks:
-            await cache.set_research(query_hash, {"answer": "", "citations": [], "sources_used": len(flat)})
+            await cache.set_research(
+                query_hash, {"answer": "", "citations": [], "sources_used": len(flat)}
+            )
             return {"ok": True, "sources_used": len(flat)}
 
         # Store to a deterministic session collection keyed by query_hash.

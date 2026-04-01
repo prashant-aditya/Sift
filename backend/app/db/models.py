@@ -31,7 +31,9 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[SAUuid] = mapped_column(SAUuid(as_uuid=True), primary_key=True)
-    external_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True)
+    external_id: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, index=True
+    )
 
     sessions: Mapped[list["ResearchSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -46,9 +48,15 @@ class ResearchSession(Base, TimestampMixin):
         SAUuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
 
-    name: Mapped[str] = mapped_column(String(255), default="Untitled session", nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="active", index=True, nullable=False)
-    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    name: Mapped[str] = mapped_column(
+        String(255), default="Untitled session", nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), default="active", index=True, nullable=False
+    )
+    archived_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     turns: Mapped[list["ResearchTurn"]] = relationship(
         back_populates="session",
@@ -71,13 +79,17 @@ class ResearchTurn(Base, TimestampMixin):
 
     query: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    citations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    citations: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
     metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     compressed_context: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     session: Mapped[ResearchSession] = relationship(back_populates="turns")
 
-    __table_args__ = (Index("ix_research_turns_session_created", "session_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_research_turns_session_created", "session_id", "created_at"),
+    )
 
 
 class SourceCache(Base, TimestampMixin):
@@ -93,4 +105,3 @@ class SourceCache(Base, TimestampMixin):
     __table_args__ = (
         Index("ux_source_cache_query_source", "query_hash", "source_name", unique=True),
     )
-

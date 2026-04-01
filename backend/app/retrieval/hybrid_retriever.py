@@ -136,4 +136,3 @@ class HybridRetriever:
         return _enforce_source_diversity(
             fused_ranked, top_k=top_k, max_per_source=self.max_per_source
         )
-

@@ -48,9 +48,18 @@ class TestRedditValidResponse:
                     {
                         "data": {
                             "children": [
-                                {"kind": "t1", "data": {"body": "Comment A", "score": 10}},
-                                {"kind": "t1", "data": {"body": "Comment B", "score": 5}},
-                                {"kind": "t1", "data": {"body": "Comment C", "score": 99}},
+                                {
+                                    "kind": "t1",
+                                    "data": {"body": "Comment A", "score": 10},
+                                },
+                                {
+                                    "kind": "t1",
+                                    "data": {"body": "Comment B", "score": 5},
+                                },
+                                {
+                                    "kind": "t1",
+                                    "data": {"body": "Comment C", "score": 99},
+                                },
                             ]
                         }
                     },
@@ -75,9 +84,27 @@ class TestRedditValidResponse:
                 200,
                 json=_search_payload(
                     [
-                        {"title": "A", "permalink": "/r/a/comments/1/a/", "subreddit": "a", "score": 1, "num_comments": 1},
-                        {"title": "B", "permalink": "/r/b/comments/2/b/", "subreddit": "b", "score": 1, "num_comments": 1},
-                        {"title": "C", "permalink": "/r/c/comments/3/c/", "subreddit": "c", "score": 1, "num_comments": 1},
+                        {
+                            "title": "A",
+                            "permalink": "/r/a/comments/1/a/",
+                            "subreddit": "a",
+                            "score": 1,
+                            "num_comments": 1,
+                        },
+                        {
+                            "title": "B",
+                            "permalink": "/r/b/comments/2/b/",
+                            "subreddit": "b",
+                            "score": 1,
+                            "num_comments": 1,
+                        },
+                        {
+                            "title": "C",
+                            "permalink": "/r/c/comments/3/c/",
+                            "subreddit": "c",
+                            "score": 1,
+                            "num_comments": 1,
+                        },
                     ]
                 ),
             )
@@ -91,7 +118,9 @@ class TestRedditValidResponse:
 class TestRedditEmptyAndErrors:
     @respx.mock
     async def test_empty_children_returns_empty(self, adapter: RedditAdapter):
-        respx.get(_REDDIT_SEARCH).mock(return_value=httpx.Response(200, json=_search_payload([])))
+        respx.get(_REDDIT_SEARCH).mock(
+            return_value=httpx.Response(200, json=_search_payload([]))
+        )
         assert await adapter.search("x") == []
 
     @respx.mock
@@ -100,7 +129,9 @@ class TestRedditEmptyAndErrors:
         assert await adapter.search("x") == []
 
     @respx.mock
-    async def test_429_retries_then_succeeds(self, adapter: RedditAdapter, monkeypatch: pytest.MonkeyPatch):
+    async def test_429_retries_then_succeeds(
+        self, adapter: RedditAdapter, monkeypatch: pytest.MonkeyPatch
+    ):
         monkeypatch.setattr("app.sources.reddit._REDDIT_MIN_INTERVAL_SECONDS", 0.0)
         respx.get(_REDDIT_SEARCH).mock(
             side_effect=[
@@ -109,4 +140,3 @@ class TestRedditEmptyAndErrors:
             ]
         )
         assert await adapter.search("x") == []
-

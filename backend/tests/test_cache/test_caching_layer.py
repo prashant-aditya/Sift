@@ -35,13 +35,19 @@ async def test_hash_query_normalizes_casing_whitespace_and_punctuation():
     q1 = "  What is Redis?  "
     q2 = "what is redis"
     q3 = "WHAT IS REDIS!!!"
-    assert ResearchCache.hash_query(q1) == ResearchCache.hash_query(q2) == ResearchCache.hash_query(q3)
+    assert (
+        ResearchCache.hash_query(q1)
+        == ResearchCache.hash_query(q2)
+        == ResearchCache.hash_query(q3)
+    )
 
 
 @pytest.mark.asyncio
 async def test_research_cache_fresh_vs_stale_detection():
     redis = _FakeAsyncRedis()
-    cache = ResearchCache(redis, stale_threshold_seconds=3600 * 20, fresh_ttl_seconds=3600 * 24)
+    cache = ResearchCache(
+        redis, stale_threshold_seconds=3600 * 20, fresh_ttl_seconds=3600 * 24
+    )
     qh = ResearchCache.hash_query("hello")
 
     await cache.set_research(qh, {"answer": "hi"})
@@ -73,11 +79,13 @@ async def test_orchestrator_fresh_cache_hit_returns_without_running_pipeline():
         celery_app=None,
     )
 
-    orch._cache.get_research = AsyncMock(return_value=CacheResult(  # type: ignore[attr-defined]
-        data={"answer": "cached", "citations": [], "sources_used": 1},
-        ttl_seconds=3600 * 23,
-        is_fresh=True,
-    ))
+    orch._cache.get_research = AsyncMock(
+        return_value=CacheResult(  # type: ignore[attr-defined]
+            data={"answer": "cached", "citations": [], "sources_used": 1},
+            ttl_seconds=3600 * 23,
+            is_fresh=True,
+        )
+    )
 
     events = []
     async for ev in orch.research("Any query"):
@@ -108,11 +116,13 @@ async def test_orchestrator_stale_cache_hit_triggers_refresh_when_celery_availab
         celery_app=celery_app,
     )
 
-    orch._cache.get_research = AsyncMock(return_value=CacheResult(  # type: ignore[attr-defined]
-        data={"answer": "stale", "citations": [], "sources_used": 1},
-        ttl_seconds=3600 * 2,
-        is_fresh=False,
-    ))
+    orch._cache.get_research = AsyncMock(
+        return_value=CacheResult(  # type: ignore[attr-defined]
+            data={"answer": "stale", "citations": [], "sources_used": 1},
+            ttl_seconds=3600 * 2,
+            is_fresh=False,
+        )
+    )
 
     async for _ in orch.research("Any query", depth="standard"):
         pass
@@ -143,4 +153,3 @@ async def test_embedding_cache_avoids_reembedding_identical_texts():
     assert len(calls) == 1
     stats = cache.stats()
     assert stats.hits > 0
-

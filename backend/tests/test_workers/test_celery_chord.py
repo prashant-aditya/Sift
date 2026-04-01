@@ -16,7 +16,9 @@ class FakeAdapter(SourceAdapter):
     name = "fake"
     display_name = "Fake"
 
-    async def search(self, query: str, max_results: int | None = None) -> list[SourceResult]:
+    async def search(
+        self, query: str, max_results: int | None = None
+    ) -> list[SourceResult]:
         out = [
             SourceResult(
                 title=f"Result for {query}",
@@ -35,7 +37,9 @@ class FailingAdapter(SourceAdapter):
     name = "failing"
     display_name = "Failing"
 
-    async def search(self, query: str, max_results: int | None = None) -> list[SourceResult]:
+    async def search(
+        self, query: str, max_results: int | None = None
+    ) -> list[SourceResult]:
         raise RuntimeError("boom")
 
     def is_available(self) -> bool:
@@ -75,13 +79,21 @@ def test_chord_search_and_process_results_eager_mode():
     fake_store = MagicMock()
     fake_store.upsert_chunks = MagicMock(return_value=1)
 
-    with patch("workers.tasks._build_source_registry", return_value=registry), patch(
-        "workers.callbacks._build_ingestion_pipeline", return_value=fake_pipeline
-    ), patch("workers.callbacks._build_vector_store", return_value=fake_store):
+    with (
+        patch("workers.tasks._build_source_registry", return_value=registry),
+        patch(
+            "workers.callbacks._build_ingestion_pipeline", return_value=fake_pipeline
+        ),
+        patch("workers.callbacks._build_vector_store", return_value=fake_store),
+    ):
         header = [
             celery_app.signature(
                 "workers.tasks.search_source",
-                kwargs={"source_name": "fake", "sub_queries": ["q1", "q2"], "max_results": 3},
+                kwargs={
+                    "source_name": "fake",
+                    "sub_queries": ["q1", "q2"],
+                    "max_results": 3,
+                },
             )
         ]
         callback = celery_app.signature(
@@ -118,8 +130,11 @@ def test_search_source_retries_on_exception():
         # In eager mode, Celery raises Retry immediately when self.retry is called.
         with pytest.raises(Exception) as excinfo:
             celery_app.tasks["workers.tasks.search_source"].apply(
-                kwargs={"source_name": "failing", "sub_queries": ["q"], "max_results": 3}
+                kwargs={
+                    "source_name": "failing",
+                    "sub_queries": ["q"],
+                    "max_results": 3,
+                }
             ).get()
 
     assert "Retry" in excinfo.exconly() or "boom" in excinfo.exconly()
-

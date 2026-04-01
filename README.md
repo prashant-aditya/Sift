@@ -2182,13 +2182,13 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `api/dependencies.py` | **Duration:** 2 days
 
-- [ ] **CP-2.10.1** Implement JWT verification dependency `get_current_user()`:
+- [x] **CP-2.10.1** Implement JWT verification dependency `get_current_user()`:
   - Verify Supabase JWT token from `Authorization: Bearer` header
   - Decode with `settings.supabase_jwt_secret`, algorithm HS256
   - Get or create user in local DB from `sub` claim
-- [ ] **CP-2.10.2** Protect endpoints: `/research`, `/sessions`, `/knowledge` require auth
-- [ ] **CP-2.10.3** Implement anonymous mode: allow unauthenticated research with ephemeral sessions (no persistence)
-- [ ] **CP-2.10.4** Write tests: valid/invalid/expired token handling
+- [x] **CP-2.10.2** Protect endpoints: `/research`, `/sessions`, `/knowledge` require auth
+- [x] **CP-2.10.3** Implement anonymous mode: allow unauthenticated research with ephemeral sessions (no persistence)
+- [x] **CP-2.10.4** Write tests: valid/invalid/expired token handling
 
 **Checkpoint Review:**
 - Authenticated users have persistent sessions
@@ -2200,13 +2200,13 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** DevOps | **Files:** `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.pre-commit-config.yaml` | **Duration:** 1 day
 
-- [ ] **CP-2.11.1** Create `ci.yml` (on PR to `main`):
+- [x] **CP-2.11.1** Create `ci.yml` (on PR to `main`):
   - Lint: `ruff check`, `ruff format --check`, `mypy`
   - Test: `pytest -v --cov=app --cov-fail-under=85` (with Redis service container)
-- [ ] **CP-2.11.2** Create `deploy.yml` (on push to `main`):
+- [x] **CP-2.11.2** Create `deploy.yml` (on push to `main`):
   - Trigger Render deploy hook (webhook URL)
-- [ ] **CP-2.11.3** Add pre-commit config: ruff + mypy + fast pytest
-- [ ] **CP-2.11.4** Branch protection on `main`: require CI pass + 1 review
+- [x] **CP-2.11.3** Add pre-commit config: ruff + mypy + fast pytest
+- [x] **CP-2.11.4** Branch protection on `main`: require CI pass + 1 review
 
 **Checkpoint Review:**
 - PRs blocked if tests fail or coverage drops below 85%
@@ -2218,19 +2218,56 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** DevOps + Backend Lead | **Duration:** 2 days
 
-- [ ] **CP-2.12.1** **Render:** Web Service for backend (Docker, free tier) + Background Worker for Celery
-  - Set env vars: `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`, `UPSTASH_REDIS_URL`
-  - Health check: `/api/v1/health`
-  - UptimeRobot ping every 14 min (free tier sleeps after 15 min)
-- [ ] **CP-2.12.2** **Supabase:** Create project, run Alembic migration, enable email auth + GitHub OAuth
-- [ ] **CP-2.12.3** **Upstash:** Create Redis database (free tier: 10K commands/day), verify Celery broker connection
-- [ ] **CP-2.12.4** **Monitoring:** Better Stack or UptimeRobot for uptime, structured logging with `structlog`
-- [ ] **CP-2.12.5** **Smoke test checklist:**
-  - [ ] Backend health endpoint responds from Render URL
-  - [ ] Full research query works end-to-end in production
-  - [ ] Auth flow works (sign up, sign in, session persistence)
-  - [ ] Follow-up question works within a session
-  - [ ] Sessions list shows after auth
+- [x] **CP-2.12.1** **Render:** Web Service for backend (Docker, free tier) + Background Worker for Celery
+  - **Web Service**
+    - **Root directory**: `backend/`
+    - **Runtime**: Docker (uses `backend/Dockerfile`)
+    - **Health check path**: `/api/v1/health`
+    - **Start command** (already in Docker CMD): `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+  - **Background Worker**
+    - **Root directory**: `backend/`
+    - **Runtime**: Docker (uses the same `backend/Dockerfile`)
+    - **Start command**:
+      - `celery -A workers.celery_app.celery_app worker -Q search,ingestion --loglevel=info`
+  - **Required env vars (Render)**
+    - **LLM** (choose one provider):
+      - `GOOGLE_API_KEY` (default) **or**
+      - `NVIDIA_API_KEY` + `NVIDIA_BASE_URL` (optional, default base URL is set) **or**
+      - `GROQ_API_KEY` (legacy name in plan; only if/when Groq provider is re-enabled)
+    - **Database**:
+      - `DATABASE_URL` (Supabase Postgres recommended; local SQLite works for dev)
+    - **Auth**:
+      - `SUPABASE_JWT_SECRET` (required for authenticated endpoints)
+    - **Redis / Celery**
+      - `UPSTASH_REDIS_URL`
+      - Optional overrides: `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` (if not set, Celery falls back to `UPSTASH_REDIS_URL`)
+  - **Keep-alive (free tier)**
+    - Configure UptimeRobot to `GET /api/v1/health` every **14 minutes** (Render free tier may sleep after ~15 minutes).
+- [x] **CP-2.12.2** **Supabase:** Create project, run Alembic migration, enable email auth + GitHub OAuth
+  - **Create Supabase project** (Postgres + Auth).
+  - **Configure DB**:
+    - Set `DATABASE_URL` to Supabase connection string (use `postgresql+asyncpg://...` form).
+  - **Run migrations (Alembic)** from `backend/`:
+    - `alembic upgrade head`
+  - **Enable auth providers** in Supabase dashboard:
+    - Email/password
+    - GitHub OAuth
+  - **Set `SUPABASE_JWT_SECRET`** in Render from Supabase JWT settings (do not log it).
+- [x] **CP-2.12.3** **Upstash:** Create Redis database (free tier: 10K commands/day), verify Celery broker connection
+  - Create an Upstash Redis database (TLS URL).
+  - Set `UPSTASH_REDIS_URL` in both Render services (web + worker).
+  - Verify worker connectivity by deploying the worker and confirming it starts without broker connection errors.
+- [x] **CP-2.12.4** **Monitoring:** Better Stack or UptimeRobot for uptime, structured logging with `structlog`
+  - **Uptime**: UptimeRobot monitors `/api/v1/health` and alerts on downtime.
+  - **Structured logs**:
+    - Set `LOG_FORMAT=json` on Render to enable `structlog` JSON output.
+    - Optionally set `LOG_LEVEL=INFO` (or `DEBUG` temporarily during bring-up).
+- [x] **CP-2.12.5** **Smoke test checklist:**
+  - [x] Backend health endpoint responds from Render URL
+  - [x] Full research query works end-to-end in production
+  - [x] Auth flow works (sign up, sign in, session persistence)
+  - [x] Follow-up question works within a session
+  - [x] Sessions list shows after auth
 
 **Checkpoint Review:**
 - Full stack accessible at public URLs
@@ -2243,15 +2280,15 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 | # | Criteria | Status |
 |---|----------|--------|
-| 1 | All 12 goals completed and merged to `main` | [ ] |
-| 2 | 85%+ test coverage | [ ] |
-| 3 | Deployed at public URLs, total cost $0/month | [ ] |
-| 4 | Circuit breakers, rate limiting, caching operational | [ ] |
-| 5 | 5+ concurrent users without degradation | [ ] |
-| 6 | Stale-while-revalidate cache hit <300ms | [ ] |
-| 7 | Hybrid retrieval (BM25 + Dense + RRF) active | [ ] |
-| 8 | 5 source adapters all functional | [ ] |
-| 9 | Follow-up questions with context compression | [ ] |
+| 1 | All 12 goals completed and merged to `main` | [x] |
+| 2 | 85%+ test coverage | [x] |
+| 3 | Deployed at public URLs, total cost $0/month | [x] |
+| 4 | Circuit breakers, rate limiting, caching operational | [x] |
+| 5 | 5+ concurrent users without degradation | [x] |
+| 6 | Stale-while-revalidate cache hit <300ms | [x] |
+| 7 | Hybrid retrieval (BM25 + Dense + RRF) active | [x] |
+| 8 | 5 source adapters all functional | [x] |
+| 9 | Follow-up questions with context compression | [x] |
 
 **Phase 2 Deliverable:** Production-grade research engine with hybrid retrieval, Celery parallelism, resilience patterns, persistent sessions, auth, and deployed to free-tier infrastructure.
 

@@ -12,10 +12,20 @@ def _env(name: str, default: str) -> str:
     return val if val is not None and val != "" else default
 
 
+def _redis_url_fallback(default: str) -> str:
+    """
+    Prefer explicit Celery URLs, but fall back to UPSTASH_REDIS_URL for
+    free-tier deployments where a single Redis URL is provided.
+    """
+    return _env("UPSTASH_REDIS_URL", default)
+
+
 celery_app = Celery(
     "sift",
-    broker=_env("CELERY_BROKER_URL", "redis://redis:6379/0"),
-    backend=_env("CELERY_RESULT_BACKEND", "redis://redis:6379/0"),
+    broker=_env("CELERY_BROKER_URL", _redis_url_fallback("redis://redis:6379/0")),
+    backend=_env(
+        "CELERY_RESULT_BACKEND", _redis_url_fallback("redis://redis:6379/0")
+    ),
     include=["workers.tasks", "workers.callbacks"],
 )
 
@@ -35,4 +45,3 @@ celery_app.conf.update(
         "workers.tasks.refresh_research": {"queue": "ingestion"},
     },
 )
-

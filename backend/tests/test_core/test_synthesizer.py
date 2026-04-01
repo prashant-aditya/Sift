@@ -21,6 +21,7 @@ from app.ingestion.chunker import Chunk
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_chunk(
     *,
     text: str = "sample text",
@@ -83,6 +84,7 @@ def synthesizer():
 # _build_user_message tests
 # ---------------------------------------------------------------------------
 
+
 class TestBuildUserMessage:
     def test_contains_numbered_sources(self, sample_chunks: list[RetrievedChunk]):
         msg = _build_user_message("Kafka vs RabbitMQ", sample_chunks)
@@ -106,6 +108,7 @@ class TestBuildUserMessage:
 # ---------------------------------------------------------------------------
 # build_citation_map tests
 # ---------------------------------------------------------------------------
+
 
 class TestBuildCitationMap:
     def test_maps_chunks_to_numeric_ids(self, sample_chunks: list[RetrievedChunk]):
@@ -131,9 +134,12 @@ class TestBuildCitationMap:
 # Synthesizer.synthesize tests (Groq API mocked)
 # ---------------------------------------------------------------------------
 
+
 class TestSynthesizerStream:
     @pytest.mark.asyncio
-    async def test_empty_chunks_yields_no_sources_message(self, synthesizer: Synthesizer):
+    async def test_empty_chunks_yields_no_sources_message(
+        self, synthesizer: Synthesizer
+    ):
         """When no chunks are provided, yield a canned response without calling the LLM."""
         tokens: list[str] = []
         async for token in synthesizer.synthesize("anything", []):
@@ -150,12 +156,23 @@ class TestSynthesizerStream:
     ):
         """Mocked Gemini stream should yield tokens that include citation markers."""
         streamed_tokens = [
-            "Kafka ", "uses ", "a ", "distributed ", "commit ", "log ", "[1]. ",
-            "RabbitMQ ", "implements ", "AMQP ", "[2].",
+            "Kafka ",
+            "uses ",
+            "a ",
+            "distributed ",
+            "commit ",
+            "log ",
+            "[1]. ",
+            "RabbitMQ ",
+            "implements ",
+            "AMQP ",
+            "[2].",
         ]
 
         mock_stream = _make_async_stream(streamed_tokens)
-        synthesizer._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = AsyncMock(
+            return_value=mock_stream
+        )
 
         collected: list[str] = []
         async for token in synthesizer.synthesize("Kafka vs RabbitMQ", sample_chunks):
@@ -214,7 +231,9 @@ class TestSynthesizerStream:
     ):
         """Tokens with None or empty content should be silently skipped."""
         mock_stream = _make_async_stream(["hello", None, "", "world"])
-        synthesizer._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = AsyncMock(
+            return_value=mock_stream
+        )
 
         collected = []
         async for t in synthesizer.synthesize("test", sample_chunks):
@@ -227,6 +246,7 @@ class TestSynthesizerStream:
 # Synthesizer.synthesize_complete tests
 # ---------------------------------------------------------------------------
 
+
 class TestSynthesizeComplete:
     @pytest.mark.asyncio
     async def test_returns_full_answer_and_citations(
@@ -235,7 +255,9 @@ class TestSynthesizeComplete:
         sample_chunks: list[RetrievedChunk],
     ):
         mock_stream = _make_async_stream(["Answer ", "with ", "[1] ", "citation."])
-        synthesizer._client.aio.models.generate_content_stream = AsyncMock(return_value=mock_stream)
+        synthesizer._client.aio.models.generate_content_stream = AsyncMock(
+            return_value=mock_stream
+        )
 
         result = await synthesizer.synthesize_complete("test", sample_chunks)
 
@@ -255,6 +277,7 @@ class TestSynthesizeComplete:
 # ---------------------------------------------------------------------------
 # Async stream mock helper
 # ---------------------------------------------------------------------------
+
 
 class _AsyncStreamIter:
     """Mimics the async iterator returned by streaming LLM calls."""

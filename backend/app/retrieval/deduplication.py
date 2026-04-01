@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Iterable, Optional
+from typing import Iterable
 
 try:
     from datasketch import MinHash, MinHashLSH  # type: ignore
@@ -166,7 +166,9 @@ class MinHashDeduplicator:
 
         return [items[i] for i in range(len(items)) if i in keep_indices]
 
-    def _select_authoritative(self, items: list[DedupItem], group: Iterable[int]) -> int:
+    def _select_authoritative(
+        self, items: list[DedupItem], group: Iterable[int]
+    ) -> int:
         def score(idx: int) -> tuple[int, int, int]:
             item = items[idx]
             rank = self._authority_rank.get(item.source_name, self._default_rank)
@@ -174,4 +176,3 @@ class MinHashDeduplicator:
             return (rank, -len(item.text), idx)
 
         return min(group, key=score)
-

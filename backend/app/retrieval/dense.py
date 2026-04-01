@@ -39,4 +39,3 @@ class DenseRetriever:
             top_k,
             where,
         )
-
