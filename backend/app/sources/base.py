@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,9 +11,9 @@ class SourceResult(BaseModel):
     title: str
     url: str
     snippet: str
-    raw_content: str | None = None
+    raw_content: Optional[str] = None
     source_name: str
-    published_date: datetime | None = None
+    published_date: Optional[datetime] = None
     metadata: dict = Field(default_factory=dict)
 
 
@@ -30,7 +31,7 @@ class SourceAdapter(ABC):
 
     @abstractmethod
     async def search(
-        self, query: str, max_results: int | None = None
+        self, query: str, max_results: Optional[int] = None
     ) -> list[SourceResult]:
         """Run a search and return structured results."""
         ...

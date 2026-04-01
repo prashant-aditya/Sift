@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from app.ingestion.chunker import Chunk, TextChunker
 from app.ingestion.embedder import EmbeddingGenerator
 from app.ingestion.extractors import ContentExtractor
+from app.retrieval.deduplication import DedupItem, MinHashDeduplicator
 from app.sources.base import SourceResult
 
 logger = logging.getLogger(__name__)
@@ -26,26 +28,56 @@ class IngestionPipeline:
 
     def __init__(
         self,
-        extractor: ContentExtractor | None = None,
-        chunker: TextChunker | None = None,
-        embedder: EmbeddingGenerator | None = None,
+        extractor: Optional[ContentExtractor] = None,
+        chunker: Optional[TextChunker] = None,
+        embedder: Optional[EmbeddingGenerator] = None,
+        deduplicator: Optional[MinHashDeduplicator] = None,
     ) -> None:
         self._extractor = extractor or ContentExtractor()
         self._chunker = chunker or TextChunker()
         self._embedder = embedder or EmbeddingGenerator()
+        if deduplicator is not None:
+            self._deduplicator: Optional[MinHashDeduplicator] = deduplicator
+        else:
+            try:
+                self._deduplicator = MinHashDeduplicator()
+            except Exception:
+                logger.warning("Deduplication disabled (datasketch not installed)")
+                self._deduplicator = None
 
     async def process(self, source_results: list[SourceResult]) -> list[Chunk]:
         """Run the full extract -> chunk -> embed pipeline."""
         if not source_results:
             return []
 
-        all_chunks: list[Chunk] = []
+        extracted: list[tuple[SourceResult, str]] = []
         for result in source_results:
             text = self._extract_content(result)
             if not text:
                 logger.debug("No extractable content from %s", result.url)
                 continue
+            extracted.append((result, text))
 
+        if not extracted:
+            logger.info("No extractable documents from %d source results", len(source_results))
+            return []
+
+        deduped_docs = extracted
+        if self._deduplicator is not None:
+            dedup_items = [
+                DedupItem(text=text, source_name=result.source_name, item_id=result.url)
+                for result, text in extracted
+            ]
+            deduped_items = self._deduplicator.deduplicate(dedup_items)
+            kept_urls = {i.item_id for i in deduped_items if i.item_id}
+            deduped_docs = [
+                (result, text)
+                for (result, text) in extracted
+                if (not kept_urls) or (result.url in kept_urls)
+            ]
+
+        all_chunks: list[Chunk] = []
+        for result, text in deduped_docs:
             chunks = self._chunker.chunk(
                 text,
                 source_url=result.url,

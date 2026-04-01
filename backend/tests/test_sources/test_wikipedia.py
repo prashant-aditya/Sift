@@ -6,8 +6,6 @@ import respx
 
 from app.sources.wikipedia import WikipediaAdapter, _SEARCH_API, _SUMMARY_API
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def adapter() -> WikipediaAdapter:

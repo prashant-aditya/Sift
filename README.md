@@ -32,6 +32,119 @@ This document is the single source of truth for the backend team. It contains ev
 
 ---
 
+## Quick Setup (5 Minutes)
+
+> For a detailed walkthrough, see [QUICKSTART.md](QUICKSTART.md). For demo queries, see [demo_queries.md](demo_queries.md).
+
+```bash
+# 1. Clone and enter the backend directory
+git clone https://github.com/your-org/sift.git
+cd sift/backend
+
+# 2. Configure your API key
+cp .env.example .env
+# Edit .env — set LLM_PROVIDER and the corresponding API key
+
+# 3. Start the backend
+docker compose up --build -d
+
+# 4. Verify
+curl http://localhost:8000/api/v1/health
+# → {"status": "ok", "version": "0.1.0"}
+```
+
+### Working API Examples (Phase 1)
+
+**Health Check:**
+
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+```json
+{"status": "ok", "version": "0.1.0"}
+```
+
+**Research Query (SSE Stream):**
+
+```bash
+curl -N -X POST http://localhost:8000/api/v1/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What are the trade-offs between Kafka and RabbitMQ for event-driven microservices?",
+    "depth": "standard"
+  }'
+```
+
+Request body fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | string (3-2000 chars) | Yes | The research question |
+| `sources` | string array or null | No | Source adapter names (`"duckduckgo"`, `"wikipedia"`, `"hackernews"`). Null uses all. |
+| `depth` | `"quick"` \| `"standard"` \| `"deep"` | No | Controls results per source and retrieval depth. Default: `"standard"`. |
+
+**SSE Response Stream:**
+
+```
+event: status
+data: {"phase": "decomposing", "session_id": "session_a1b2c3d4e5f6"}
+
+event: status
+data: {"phase": "decomposed", "sub_queries": ["Kafka ordering and throughput characteristics", "RabbitMQ message routing and reliability features", "Kafka vs RabbitMQ operational complexity comparison"]}
+
+event: status
+data: {"phase": "searching", "sources_active": 3, "sub_queries_count": 3}
+
+event: source_complete
+data: {"source": "duckduckgo", "results_count": 5}
+
+event: source_complete
+data: {"source": "wikipedia", "results_count": 5}
+
+event: source_complete
+data: {"source": "hackernews", "results_count": 5}
+
+event: status
+data: {"phase": "processing", "results_count": 15}
+
+event: status
+data: {"phase": "storing", "chunks_count": 42}
+
+event: status
+data: {"phase": "retrieving"}
+
+event: status
+data: {"phase": "synthesizing"}
+
+event: token
+data: {"content": "## Overview\n\n"}
+
+event: token
+data: {"content": "Kafka and RabbitMQ represent two fundamentally different approaches..."}
+
+event: complete
+data: {"session_id": "session_a1b2c3d4e5f6", "sources_used": 15, "citations": [{"id": 1, "title": "Apache Kafka - Wikipedia", "url": "https://en.wikipedia.org/wiki/Apache_Kafka", "source_name": "wikipedia", "relevance_score": 0.92}, {"id": 2, "title": "Kafka vs RabbitMQ", "url": "https://...", "source_name": "duckduckgo", "relevance_score": 0.88}]}
+```
+
+**Search specific sources only:**
+
+```bash
+curl -N -X POST http://localhost:8000/api/v1/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Latest developments in WebAssembly outside the browser",
+    "sources": ["duckduckgo", "hackernews"],
+    "depth": "deep"
+  }'
+```
+
+**Interactive API Docs:**
+
+Once running, visit **http://localhost:8000/docs** for the auto-generated Swagger UI where you can test all endpoints interactively.
+
+---
+
 ## 1. System Overview
 
 Sift is a self-hostable AI research engine that:
@@ -1699,7 +1812,7 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `core/orchestrator.py`, `api/routes/research.py` | **Duration:** Days 5-6
 
-- [ ] **CP-1.6.1** Implement `ResearchOrchestrator` with 7-step pipeline:
+- [x] **CP-1.6.1** Implement `ResearchOrchestrator` with 7-step pipeline:
   1. Analyze query → sub-queries → yield `status` event
   2. Fan-out searches via `asyncio.gather` → yield `source_complete` events
   3. Ingest results → yield `status` event
@@ -1707,10 +1820,10 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
   5. Retrieve top-15 via vector similarity
   6. Stream synthesis via LLM → yield `token` events
   7. Complete → yield `complete` event with `session_id` + citations
-- [ ] **CP-1.6.2** Implement SSE endpoint `POST /api/v1/research` using `EventSourceResponse`
-- [ ] **CP-1.6.3** Define request model `ResearchRequest` with `query`, `sources`, `depth` fields
-- [ ] **CP-1.6.4** Wrap each source search in try/except — log failures, continue with remaining sources
-- [ ] **CP-1.6.5** Write tests:
+- [x] **CP-1.6.2** Implement SSE endpoint `POST /api/v1/research` using `EventSourceResponse`
+- [x] **CP-1.6.3** Define request model `ResearchRequest` with `query`, `sources`, `depth` fields
+- [x] **CP-1.6.4** Wrap each source search in try/except — log failures, continue with remaining sources
+- [x] **CP-1.6.5** Write tests:
   - Full pipeline e2e with mocked sources and mocked LLM
   - Partial source failure (1 of 3 fails → still returns results)
   - Empty results handling
@@ -1741,10 +1854,10 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `docker-compose.yml`, `docker-compose.dev.yml`, `Makefile` | **Duration:** Day 8
 
-- [ ] **CP-1.7.1** Create production `docker-compose.yml`:
+- [x] **CP-1.7.1** Create production `docker-compose.yml`:
   - `backend` service with health check, env vars, chroma volume
-- [ ] **CP-1.7.2** Create `docker-compose.dev.yml` with volume mounts for hot reload (`uvicorn --reload`)
-- [ ] **CP-1.7.3** Create `Makefile` with targets: `dev`, `prod`, `test`, `test-coverage`, `lint`, `logs`, `down`, `clean`
+- [x] **CP-1.7.2** Create `docker-compose.dev.yml` with volume mounts for hot reload (`uvicorn --reload`)
+- [x] **CP-1.7.3** Create `Makefile` with targets: `dev`, `prod`, `test`, `test-coverage`, `lint`, `logs`, `down`, `clean`
 
 **Checkpoint Review:**
 - `make dev` starts full stack with hot reload
@@ -1757,22 +1870,22 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Entire team | **Files:** `tests/**` | **Duration:** Days 9-12
 
-- [ ] **CP-1.8.1** Create `conftest.py` with shared fixtures:
+- [x] **CP-1.8.1** Create `conftest.py` with shared fixtures:
   - `mock_groq_client`, `sample_source_results`, `temp_chroma_dir`, `vector_store`
-- [ ] **CP-1.8.2** Source adapter tests (5 per adapter — 15 total):
+- [x] **CP-1.8.2** Source adapter tests (5 per adapter — 15 total):
   valid response, empty results, timeout, rate limit, malformed response
-- [ ] **CP-1.8.3** Ingestion tests (18+):
+- [x] **CP-1.8.3** Ingestion tests (18+):
   chunker sizes/overlaps, metadata preservation, HTML extraction, embedding batching, full pipeline
-- [ ] **CP-1.8.4** Vector store tests (5+):
+- [x] **CP-1.8.4** Vector store tests (5+):
   upsert, query, metadata filter, empty collection, persistence
-- [ ] **CP-1.8.5** Core tests (13+):
+- [x] **CP-1.8.5** Core tests (13+):
   - Query analyzer: decomposition, passthrough, malformed LLM response, empty query
   - Synthesizer: streaming, citation format, empty chunks, max token handling
   - Orchestrator: full pipeline, partial failure, all fail, timeout, SSE format
-- [ ] **CP-1.8.6** API endpoint tests (4+):
+- [x] **CP-1.8.6** API endpoint tests (4+):
   valid request, invalid request, SSE format, concurrent requests
-- [ ] **CP-1.8.7** Configure `pytest.ini` with `asyncio_mode = auto`, markers for `slow` and `integration`
-- [ ] **CP-1.8.8** Achieve **70%+ overall coverage**, **90%+ on critical paths** (orchestrator, retrieval, synthesis)
+- [x] **CP-1.8.7** Configure `pytest.ini` with `asyncio_mode = auto`, markers for `slow` and `integration`
+- [x] **CP-1.8.8** Achieve **70%+ overall coverage**, **90%+ on critical paths** (orchestrator, retrieval, synthesis)
 
 **Checkpoint Review:**
 - `pytest` passes with 0 failures
@@ -1785,10 +1898,10 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Duration:** Days 13-14
 
-- [ ] **CP-1.9.1** Write `QUICKSTART.md` with 5-minute setup guide
-- [ ] **CP-1.9.2** Create `demo_queries.md` with 10 demo queries that showcase multi-source synthesis
-- [ ] **CP-1.9.3** Verify Docker setup works from a clean clone on a fresh machine
-- [ ] **CP-1.9.4** Update README with actual API examples and setup instructions
+- [x] **CP-1.9.1** Write `QUICKSTART.md` with 5-minute setup guide
+- [x] **CP-1.9.2** Create `demo_queries.md` with 10 demo queries that showcase multi-source synthesis
+- [x] **CP-1.9.3** Verify Docker setup works from a clean clone on a fresh machine
+- [x] **CP-1.9.4** Update README with actual API examples and setup instructions
 
 **Checkpoint Review:**
 - New developer can clone repo and have it running in under 5 minutes
@@ -1800,12 +1913,12 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 | # | Criteria | Status |
 |---|----------|--------|
-| 1 | All 9 goals completed and merged to `main` | [ ] |
-| 2 | 70%+ test coverage (90%+ on critical paths) | [ ] |
-| 3 | Docker Compose starts cleanly from fresh clone | [ ] |
-| 4 | 10 demo queries produce quality cited answers | [ ] |
-| 5 | No critical bugs in the happy path | [ ] |
-| 6 | SSE stream format verified (status → source_complete → token → complete) | [ ] |
+| 1 | All 9 goals completed and merged to `main` | [x] |
+| 2 | 70%+ test coverage (90%+ on critical paths) | [x] |
+| 3 | Docker Compose starts cleanly from fresh clone | [x] |
+| 4 | 10 demo queries produce quality cited answers | [x] |
+| 5 | No critical bugs in the happy path | [x] |
+| 6 | SSE stream format verified (status → source_complete → token → complete) | [x] |
 
 **Phase 1 Deliverable:** Enter a question → get a cited, multi-source answer streamed in real-time. Dockerized, tested, documented.
 
@@ -1826,16 +1939,16 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `retrieval/bm25.py` | **Duration:** 2 days
 
-- [ ] **CP-2.1.1** Implement `BM25Index` class from scratch (no external dependency):
+- [x] **CP-2.1.1** Implement `BM25Index` class from scratch (no external dependency):
   - Parameters: `k1=1.5` (term frequency saturation), `b=0.75` (document length normalization)
   - IDF formula: `log((N - df + 0.5) / (df + 0.5) + 1)`
   - BM25 scoring: `Σ IDF(t) * (tf * (k1+1)) / (tf + k1*(1-b+b*dl/avgdl))`
-- [ ] **CP-2.1.2** Implement `fit()` — build inverted index: term → `list[(doc_idx, term_freq)]`, compute doc lengths + avg doc length
-- [ ] **CP-2.1.3** Implement `query()` — tokenize query, score each document, return `top_k` ranked results
-- [ ] **CP-2.1.4** Tokenizer: whitespace + lowercasing + stop word removal (hardcoded English list)
-- [ ] **CP-2.1.5** Implement `add_documents()` for incremental index updates without full refit
-- [ ] **CP-2.1.6** Index persistence: pickle the fitted index alongside ChromaDB data
-- [ ] **CP-2.1.7** Write tests: keyword match ranking, empty query, single-doc corpus, index save/load
+- [x] **CP-2.1.2** Implement `fit()` — build inverted index: term → `list[(doc_idx, term_freq)]`, compute doc lengths + avg doc length
+- [x] **CP-2.1.3** Implement `query()` — tokenize query, score each document, return `top_k` ranked results
+- [x] **CP-2.1.4** Tokenizer: whitespace + lowercasing + stop word removal (hardcoded English list)
+- [x] **CP-2.1.5** Implement `add_documents()` for incremental index updates without full refit
+- [x] **CP-2.1.6** Index persistence: pickle the fitted index alongside ChromaDB data
+- [x] **CP-2.1.7** Write tests: keyword match ranking, empty query, single-doc corpus, index save/load
 
 **Checkpoint Review:**
 - BM25 index builds over chunk corpus
@@ -1848,14 +1961,14 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `retrieval/hybrid_retriever.py`, `retrieval/dense.py` | **Duration:** 2 days
 
-- [ ] **CP-2.2.1** Extract dense retrieval into `DenseRetriever` class wrapping ChromaDB vector search
-- [ ] **CP-2.2.2** Implement `HybridRetriever` with RRF fusion:
+- [x] **CP-2.2.1** Extract dense retrieval into `DenseRetriever` class wrapping ChromaDB vector search
+- [x] **CP-2.2.2** Implement `HybridRetriever` with RRF fusion:
   - BM25 top-50 → Dense top-50 → `RRF(d) = Σ 1/(k + rank_i(d))` with k=60
   - Return fused top-15
-- [ ] **CP-2.2.3** Integrate `HybridRetriever` into orchestrator — replace direct ChromaDB query
-- [ ] **CP-2.2.4** Implement source diversity enforcement: max 3 chunks from same source in top-15
-- [ ] **CP-2.2.5** Write tests: RRF boosts docs in both rankings, non-overlapping sets, single list degradation, hybrid e2e
-- [ ] **CP-2.2.6** Benchmark on small golden dataset (10 queries with known relevant docs)
+- [x] **CP-2.2.3** Integrate `HybridRetriever` into orchestrator — replace direct ChromaDB query
+- [x] **CP-2.2.4** Implement source diversity enforcement: max 3 chunks from same source in top-15
+- [x] **CP-2.2.5** Write tests: RRF boosts docs in both rankings, non-overlapping sets, single list degradation, hybrid e2e
+- [x] **CP-2.2.6** Benchmark on small golden dataset (10 queries with known relevant docs)
 
 **Checkpoint Review:**
 - Hybrid retrieval produces better results than dense-only or sparse-only
@@ -1868,12 +1981,12 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `retrieval/deduplication.py` | **Duration:** 1 day
 
-- [ ] **CP-2.3.1** Implement `MinHashDeduplicator` using `datasketch`:
+- [x] **CP-2.3.1** Implement `MinHashDeduplicator` using `datasketch`:
   - 128 permutations, threshold 0.8 Jaccard similarity
   - Tokenize into 3-grams (shingles)
-- [ ] **CP-2.3.2** Authority-based duplicate selection: ArXiv > Wikipedia > HackerNews > Reddit > DuckDuckGo
-- [ ] **CP-2.3.3** Integrate into `IngestionPipeline`: deduplicate after extraction, before embedding
-- [ ] **CP-2.3.4** Write tests: identical docs detected, rephrased docs detected, different docs not flagged, authority selection
+- [x] **CP-2.3.2** Authority-based duplicate selection: ArXiv > Wikipedia > HackerNews > Reddit > DuckDuckGo
+- [x] **CP-2.3.3** Integrate into `IngestionPipeline`: deduplicate after extraction, before embedding
+- [x] **CP-2.3.4** Write tests: identical docs detected, rephrased docs detected, different docs not flagged, authority selection
 
 **Checkpoint Review:**
 - Deduplication runs in <100ms for 100 documents
@@ -1897,17 +2010,17 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `workers/celery_app.py`, `workers/tasks.py`, `workers/callbacks.py` | **Duration:** 2 days
 
-- [ ] **CP-2.4.1** Add dependencies: `celery[redis]`, `redis`
-- [ ] **CP-2.4.2** Configure Celery in `celery_app.py`:
+- [x] **CP-2.4.1** Add dependencies: `celery[redis]`, `redis`
+- [x] **CP-2.4.2** Configure Celery in `celery_app.py`:
   - JSON serialization, UTC timezone
   - Soft time limit: 15s, hard time limit: 20s
   - Late ack, prefetch multiplier 1
   - Task routes: `search_source` → `search` queue, `process_results` → `ingestion` queue
-- [ ] **CP-2.4.3** Implement `search_source` task: search a single source with all sub-queries, max 2 retries
-- [ ] **CP-2.4.4** Implement `process_results` chord callback: dedup → chunk → embed → ChromaDB upsert
-- [ ] **CP-2.4.5** Replace `asyncio.gather` in orchestrator with Celery `chord(group(...))(callback)`
-- [ ] **CP-2.4.6** Add `worker` + `redis` services to `docker-compose.yml`
-- [ ] **CP-2.4.7** Write tests in eager mode (`CELERY_ALWAYS_EAGER=True`): task execution, chord completion, retry, timeout
+- [x] **CP-2.4.3** Implement `search_source` task: search a single source with all sub-queries, max 2 retries
+- [x] **CP-2.4.4** Implement `process_results` chord callback: dedup → chunk → embed → ChromaDB upsert
+- [x] **CP-2.4.5** Replace `asyncio.gather` in orchestrator with Celery `chord(group(...))(callback)`
+- [x] **CP-2.4.6** Add `worker` + `redis` services to `docker-compose.yml`
+- [x] **CP-2.4.7** Write tests in eager mode (`CELERY_ALWAYS_EAGER=True`): task execution, chord completion, retry, timeout
 
 **Checkpoint Review:**
 - Source searches execute as Celery tasks on worker processes
@@ -1919,19 +2032,19 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 #### Goal 2.5: Redis Caching Layer
 
-**Owner:** Backend Engineer | **Files:** `cache/redis_cache.py`, `cache/embedding_cache.py` | **Duration:** 2 days
+**Owner:** Backend Engineer | **Files:** `backend/app/cache/redis_cache.py`, `backend/app/cache/embedding_cache.py` | **Duration:** 2 days
 
-- [ ] **CP-2.5.1** Implement `ResearchCache` with two-tier caching:
+- [x] **CP-2.5.1** Implement `ResearchCache` with two-tier caching:
   - Tier 1: query hash → full synthesized result (TTL: 24h)
   - Tier 2: source + query hash → raw source results (TTL: 6h)
-- [ ] **CP-2.5.2** Implement stale-while-revalidate logic:
+- [x] **CP-2.5.2** Implement stale-while-revalidate logic:
   - Fresh hit (TTL > 20h) → return immediately
   - Stale hit (TTL ≤ 20h) → return stale + trigger background Celery refresh
   - Cache miss → full pipeline
-- [ ] **CP-2.5.3** Implement `hash_query()`: normalize (lowercase, strip, remove punctuation) → SHA-256
-- [ ] **CP-2.5.4** Implement `EmbeddingCache`: in-memory LRU (max 10K entries) via `cachetools.LRUCache`
-- [ ] **CP-2.5.5** Integrate caching into orchestrator: check cache before pipeline, store after completion
-- [ ] **CP-2.5.6** Write tests: fresh hit, stale hit + refresh trigger, miss, key normalization, embedding cache hit rate
+- [x] **CP-2.5.3** Implement `hash_query()`: normalize (lowercase, strip, remove punctuation) → SHA-256
+- [x] **CP-2.5.4** Implement `EmbeddingCache`: in-memory LRU (max 10K entries) via `cachetools.LRUCache`
+- [x] **CP-2.5.5** Integrate caching into orchestrator: check cache before pipeline, store after completion
+- [x] **CP-2.5.6** Write tests: fresh hit, stale hit + refresh trigger, miss, key normalization, embedding cache hit rate
 
 **Checkpoint Review:**
 - Repeat queries return in <300ms (cache hit)
@@ -1944,19 +2057,19 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `resilience/circuit_breaker.py`, `resilience/rate_limiter.py`, `resilience/retry.py` | **Duration:** 2 days
 
-- [ ] **CP-2.6.1** Implement `CircuitBreaker` (Redis-backed state machine):
+- [x] **CP-2.6.1** Implement `CircuitBreaker` (Redis-backed state machine):
   - States: CLOSED → OPEN (5 failures in 60s) → HALF_OPEN (after 30s cooldown) → CLOSED (test succeeds)
   - Redis keys: `cb:{source}:state`, `cb:{source}:failures`, `cb:{source}:last_fail`, `cb:{source}:opened_at`
   - Async context manager (`async with circuit_breaker:`)
-- [ ] **CP-2.6.2** Implement `TokenBucketRateLimiter` (Redis-backed):
+- [x] **CP-2.6.2** Implement `TokenBucketRateLimiter` (Redis-backed):
   - Per-source limits: DDG 1/sec burst 5, Reddit 0.5/sec burst 3, HN 2/sec burst 10, ArXiv 0.33/sec burst 3, Wikipedia 5/sec burst 20
   - `acquire()` method with timeout
-- [ ] **CP-2.6.3** Implement `with_retry` decorator:
+- [x] **CP-2.6.3** Implement `with_retry` decorator:
   - Exponential backoff: `backoff_base * 2^attempt` (1s, 2s, 4s...)
   - Jitter: +-20% to avoid thundering herd
   - Max 2 retries by default
-- [ ] **CP-2.6.4** Integrate all three into Celery source search tasks: `async with circuit_breaker: await rate_limiter.acquire(); adapter.search()`
-- [ ] **CP-2.6.5** Write tests: CB opens after N failures, CB half-open transition, CB recovery, rate limiter blocking/refill, retry backoff timing, retry gives up
+- [x] **CP-2.6.4** Integrate all three into Celery source search tasks: `async with circuit_breaker: await rate_limiter.acquire(); adapter.search()`
+- [x] **CP-2.6.5** Write tests: CB opens after N failures, CB half-open transition, CB recovery, rate limiter blocking/refill, retry backoff timing, retry gives up
 
 **Checkpoint Review:**
 - One source failing does not affect other sources
@@ -1983,20 +2096,20 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `db/models.py`, `db/session.py`, `api/routes/sessions.py` | **Duration:** 2 days
 
-- [ ] **CP-2.7.1** Add dependencies: `sqlalchemy[asyncio]`, `asyncpg`, `alembic`
-- [ ] **CP-2.7.2** Define SQLAlchemy models: `User`, `ResearchSession`, `ResearchTurn`, `SourceCache`
+- [x] **CP-2.7.1** Add dependencies: `sqlalchemy[asyncio]`, `asyncpg`, `alembic`
+- [x] **CP-2.7.2** Define SQLAlchemy models: `User`, `ResearchSession`, `ResearchTurn`, `SourceCache`
   - All models include `created_at` and `updated_at` timestamps
   - UUIDs for user-facing IDs
   - Foreign keys and proper indexes
-- [ ] **CP-2.7.3** Set up Alembic: `alembic init migrations`, configure async engine, generate initial migration
-- [ ] **CP-2.7.4** Implement async session management: `get_db()` dependency with `async_sessionmaker`
-- [ ] **CP-2.7.5** Implement session CRUD endpoints:
+- [x] **CP-2.7.3** Set up Alembic: `alembic init migrations`, configure async engine, generate initial migration
+- [x] **CP-2.7.4** Implement async session management: `get_db()` dependency with `async_sessionmaker`
+- [x] **CP-2.7.5** Implement session CRUD endpoints:
   - `GET /api/v1/sessions` — list (paginated, sorted by `updated_at`)
   - `GET /api/v1/sessions/{id}` — get with all turns
   - `PATCH /api/v1/sessions/{id}` — rename
   - `DELETE /api/v1/sessions/{id}` — soft-delete (status=archived)
-- [ ] **CP-2.7.6** Update orchestrator to persist: create `ResearchSession` on first query, create `ResearchTurn` per query
-- [ ] **CP-2.7.7** Write tests: session create/retrieve/list/archive, turn creation and ordering, pagination
+- [x] **CP-2.7.6** Update orchestrator to persist: create `ResearchSession` on first query, create `ResearchTurn` per query
+- [x] **CP-2.7.7** Write tests: session create/retrieve/list/archive, turn creation and ordering, pagination
 
 **Checkpoint Review:**
 - Research sessions persisted to PostgreSQL (Supabase)
@@ -2009,17 +2122,17 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `core/context_manager.py`, `api/routes/research.py` (update) | **Duration:** 2 days
 
-- [ ] **CP-2.8.1** Implement `ContextManager`:
+- [x] **CP-2.8.1** Implement `ContextManager`:
   - `build_context(session_id)` — load all turns for a session
   - If total turns fit in 4096 token budget → return full context
   - Else → compress older turns via LLM summary, keep last 2 turns full
   - Summary preserves: key findings, citations, contradictions, preferences
   - Cache compressed context in the turn record
-- [ ] **CP-2.8.2** Implement follow-up endpoint: `POST /api/v1/research/{session_id}/followup`
+- [x] **CP-2.8.2** Implement follow-up endpoint: `POST /api/v1/research/{session_id}/followup`
   - Augment follow-up query with session context
   - Store new chunks in same session's ChromaDB collection
   - Retrieve from session's full chunk corpus
-- [ ] **CP-2.8.3** Write tests: context building with 1/5/10 turns, compression triggers, follow-up retrieves from full corpus
+- [x] **CP-2.8.3** Write tests: context building with 1/5/10 turns, compression triggers, follow-up retrieves from full corpus
 
 **Checkpoint Review:**
 - Users can ask follow-up questions within a session
@@ -2032,18 +2145,18 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `sources/reddit.py`, `sources/arxiv.py` | **Duration:** 2 days
 
-- [ ] **CP-2.9.1** Implement `RedditAdapter`:
+- [x] **CP-2.9.1** Implement `RedditAdapter`:
   - Reddit JSON API (append `.json`), User-Agent header required
   - Target subreddits: r/programming, r/devops, r/machinelearning, r/Python, r/ExperiencedDevs
   - Extract: post title, selftext, top 5 comments by score
   - Rate limit: 1 request per 2 seconds
-- [ ] **CP-2.9.2** Implement `ArXivAdapter`:
+- [x] **CP-2.9.2** Implement `ArXivAdapter`:
   - ArXiv API via `feedparser` for Atom XML parsing
   - Extract: title, authors, abstract, published date, PDF URL
   - Abstract as raw_content (full paper text is Phase 3+)
   - Rate limit: 1 request per 3 seconds
-- [ ] **CP-2.9.3** Register both in `SourceRegistry`
-- [ ] **CP-2.9.4** Write tests per adapter: valid response, empty results, timeout, rate limit, malformed response
+- [x] **CP-2.9.3** Register both in `SourceRegistry`
+- [x] **CP-2.9.4** Write tests per adapter: valid response, empty results, timeout, rate limit, malformed response
 
 **Checkpoint Review:**
 - Reddit and ArXiv searchable as sources

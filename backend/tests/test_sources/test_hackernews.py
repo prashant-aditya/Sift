@@ -6,8 +6,6 @@ import respx
 
 from app.sources.hackernews import HackerNewsAdapter, _ITEM_URL, _SEARCH_URL
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def adapter() -> HackerNewsAdapter:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import List, Optional
 
 import tiktoken
 from pydantic import BaseModel
@@ -22,9 +23,9 @@ class Chunk(BaseModel):
     source_title: str
     chunk_index: int
     total_chunks: int
-    published_date: datetime | None = None
+    published_date: Optional[datetime] = None
     fetched_at: datetime
-    embedding: list[float] | None = None
+    embedding: Optional[List[float]] = None
 
 
 class TextChunker:
@@ -59,7 +60,7 @@ class TextChunker:
         source_url: str,
         source_name: str,
         source_title: str,
-        published_date: datetime | None = None,
+        published_date: Optional[datetime] = None,
     ) -> list[Chunk]:
         """Split *text* into :class:`Chunk` objects with full metadata."""
         if not text or not text.strip():

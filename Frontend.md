@@ -140,7 +140,7 @@ The frontend is developed independently from the backend. Where the backend isn'
 **Goal:** Full research state machine wired up. Source pills update live. Streamed markdown renders beautifully.
 
 **Morning — useResearch + Indicators:**
-- [ ] Create `src/hooks/useResearch.ts`:
+- [x] Create `src/hooks/useResearch.ts`:
   - State machine: `idle → decomposing → searching → processing → synthesizing → complete → error`
   - Wraps `useSSE` internally
   - Maps SSE events to state updates:
@@ -150,17 +150,17 @@ The frontend is developed independently from the backend. Where the backend isn'
     - `complete` → set phase, populate `citations[]` + `sessionId`
     - `agent_*` → append to `agentEvents[]` (Phase 4 prep)
   - Returns: `phase`, `tokens`, `citations`, `sourceStatuses`, `sessionId`, `agentEvents`, `error`, `startResearch()`, `startFollowUp()`, `reset()`
-- [ ] Create `components/research/PhaseIndicator.tsx`:
+- [x] Create `components/research/PhaseIndicator.tsx`:
   - Subtle text + Lucide icon above stream area
   - Phases: "Decomposing query..." (`BrainCircuit`) → "Searching N sources..." (`Search`) → "Processing results..." (`Cog`) → "Synthesizing answer..." (`Sparkles`)
   - Fade-out / fade-in transition between phases
-- [ ] Create `components/research/SourceIndicator.tsx`:
+- [x] Create `components/research/SourceIndicator.tsx`:
   - Horizontal row of status pills, one per active source
   - Per source: `waiting` (gray) → `searching` (blue, `Loader2` + `animate-spin`) → `done` (green, `Check`, count + latency) → `error` (red, `AlertCircle`, tooltip with message)
   - Updates in real-time from `sourceStatuses`
 
 **Afternoon — ResearchStream:**
-- [ ] Create `components/research/ResearchStream.tsx`:
+- [x] Create `components/research/ResearchStream.tsx`:
   - `react-markdown` + `remark-gfm` for rendering (tables, lists, bold, headers, code blocks)
   - **Citation rendering:** regex `/\[(\d+)\]/g` in paragraph text → clickable superscript badges
   - Citation badge: on hover → tooltip with source title + URL; on click → scroll to sidebar / open URL
@@ -174,11 +174,11 @@ The frontend is developed independently from the backend. Where the backend isn'
   - Props: `tokens`, `citations[]`, `isStreaming`, `onCitationClick(id)`
 
 **Checkpoint:**
-- [ ] Submit query → PhaseIndicator transitions through all states
-- [ ] Source pills update in real-time as `source_complete` events arrive
-- [ ] Markdown answer streams token-by-token with proper formatting
-- [ ] `[1]`, `[2]` rendered as clickable superscript badges with tooltips
-- [ ] Auto-scroll works, "scroll to bottom" button appears on user scroll-up
+- [x] Submit query → PhaseIndicator transitions through all states
+- [x] Source pills update in real-time as `source_complete` events arrive
+- [x] Markdown answer streams token-by-token with proper formatting
+- [x] `[1]`, `[2]` rendered as clickable superscript badges with tooltips
+- [x] Auto-scroll works, "scroll to bottom" button appears on user scroll-up
 
 ---
 
@@ -187,12 +187,12 @@ The frontend is developed independently from the backend. Where the backend isn'
 **Goal:** Full end-to-end flow: query → phases → sources → streamed answer with citations panel. Responsive two-column layout.
 
 **Morning — Citations:**
-- [ ] Create `components/research/CitationCard.tsx`:
+- [x] Create `components/research/CitationCard.tsx`:
   - Shows: citation number badge (colored by source), title, source name with icon + color, URL (truncated, linked), relevance score progress bar
   - Click → opens source URL in new tab (`rel="noopener noreferrer"`)
   - `isHighlighted` prop → pulsing border animation when scrolled to from in-text click
   - Props: `citation: Citation`, `isHighlighted?: boolean`
-- [ ] Create `components/research/CitationSidebar.tsx`:
+- [x] Create `components/research/CitationSidebar.tsx`:
   - Right sidebar (desktop) using `ScrollArea`
   - Bottom `Sheet` (mobile)
   - Citations grouped by source type, each group with source icon + count header
@@ -200,21 +200,21 @@ The frontend is developed independently from the backend. Where the backend isn'
   - Only appears after citations arrive
 
 **Afternoon — ResearchView + Page Wiring:**
-- [ ] Create `components/research/ResearchView.tsx`:
+- [x] Create `components/research/ResearchView.tsx`:
   - Composes: `PhaseIndicator` + `SourceIndicator` + `ResearchStream` + `CitationSidebar`
   - Manages citation highlight state (which citation is focused)
-- [ ] Wire into `app/page.tsx`:
+- [x] Wire into `app/page.tsx`:
   - Default state: centered `SearchBar` (hero)
   - On submit: `SearchBar` transitions to top, `ResearchView` appears below
   - Layout: `grid grid-cols-1 lg:grid-cols-[1fr_320px]` (stream + sidebar on desktop)
-- [ ] Citation click flow: `[1]` in answer → `onCitationClick(1)` → scroll CitationSidebar to card #1, highlight it
+- [x] Citation click flow: `[1]` in answer → `onCitationClick(1)` → scroll CitationSidebar to card #1, highlight it
 
 **Checkpoint:**
-- [ ] Full flow: type query → see phases → see sources → read streamed answer → citations panel
-- [ ] Click `[1]` in answer → citation #1 highlights in sidebar
-- [ ] Desktop (>1024px): two-column (stream + sidebar)
-- [ ] Mobile (<640px): single column, citations below answer
-- [ ] No visual glitches in both light and dark mode
+- [x] Full flow: type query → see phases → see sources → read streamed answer → citations panel
+- [x] Click `[1]` in answer → citation #1 highlights in sidebar
+- [x] Desktop (>1024px): two-column (stream + sidebar)
+- [x] Mobile (<640px): single column, citations below answer
+- [x] No visual glitches in both light and dark mode
 
 ---
 
@@ -222,31 +222,31 @@ The frontend is developed independently from the backend. Where the backend isn'
 
 **Goal:** App is visually polished across all states and breakpoints. WCAG AA on core flow.
 
-- [ ] Verify every component in dark mode — fix any contrast or color issues
-- [ ] Add empty states:
+- [x] Verify every component in dark mode — fix any contrast or color issues
+- [x] Add empty states:
   - Landing: clean hero with SearchBar + subtle tagline
   - No results: "No sources returned results. Try a different query." + retry button
   - Error: friendly message with error details (collapsible) + retry button
-- [ ] Add loading skeleton for initial page load (`Skeleton` component from shadcn)
-- [ ] Add `prefers-reduced-motion` media query:
+- [x] Add loading skeleton for initial page load (`Skeleton` component from shadcn)
+- [x] Add `prefers-reduced-motion` media query:
   - Disable typing cursor animation
   - Disable phase fade transitions
   - Disable citation highlight pulse
-- [ ] Accessibility pass:
+- [x] Accessibility pass:
   - `aria-live="polite"` on streaming text region + phase indicator
   - `aria-pressed` on source toggles
   - `aria-label="Source N: <title>"` on citation badges
   - Keyboard navigation: Tab through all interactive elements, Enter/Space to activate
   - Focus management: focus search input on page load
-- [ ] Test responsiveness at: 375px, 640px, 768px, 1024px, 1440px
-- [ ] Minimum touch targets: 44x44px on mobile
+- [x] Test responsiveness at: 375px, 640px, 768px, 1024px, 1440px
+- [x] Minimum touch targets: 44x44px on mobile
 
 **Checkpoint:**
-- [ ] Dark mode: correct contrast on all components (no invisible text)
-- [ ] Empty/error/loading states render correctly
-- [ ] Keyboard-only navigation works for full research flow
-- [ ] No layout breaks between 375px and 1440px
-- [ ] `prefers-reduced-motion` disables all animations
+- [x] Dark mode: correct contrast on all components (no invisible text)
+- [x] Empty/error/loading states render correctly
+- [x] Keyboard-only navigation works for full research flow
+- [x] No layout breaks between 375px and 1440px
+- [x] `prefers-reduced-motion` disables all animations
 
 ---
 
@@ -255,16 +255,16 @@ The frontend is developed independently from the backend. Where the backend isn'
 **Goal:** Frontend containerizable. Build passes for Vercel. Core hooks have unit tests.
 
 **Morning — Docker + Build:**
-- [ ] Create `frontend/Dockerfile`:
+- [x] Create `frontend/Dockerfile`:
   ```dockerfile
-  FROM node:18-alpine AS builder
+  FROM node:20-alpine AS builder
   WORKDIR /app
   COPY package.json package-lock.json ./
   RUN npm ci
   COPY . .
   RUN npm run build
 
-  FROM node:18-alpine AS runner
+  FROM node:20-alpine AS runner
   WORKDIR /app
   ENV NODE_ENV=production
   COPY --from=builder /app/public ./public
@@ -273,14 +273,14 @@ The frontend is developed independently from the backend. Where the backend isn'
   EXPOSE 3000
   CMD ["node", "server.js"]
   ```
-- [ ] Add `output: 'standalone'` to `next.config.js` (for Docker)
-- [ ] Verify: `npm run build` passes cleanly
-- [ ] Verify: `docker build -t sift-frontend .` succeeds
+- [x] Add `output: 'standalone'` to `next.config.ts` (for Docker)
+- [x] Verify: `npm run build` passes cleanly
+- [x] Verify: `docker build -t sift-frontend .` succeeds
 
 **Afternoon — Frontend Tests:**
-- [ ] Install: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
-- [ ] Configure `vitest.config.ts`
-- [ ] Write tests:
+- [x] Install: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
+- [x] Configure `vitest.config.ts`
+- [x] Write tests:
   | Test | What it validates |
   |------|-------------------|
   | `SearchBar.test.tsx` | Submit emits correct query + sources; validation rejects <3 chars; disabled while streaming |
@@ -289,13 +289,13 @@ The frontend is developed independently from the backend. Where the backend isn'
   | `useResearch.test.ts` | State transitions through all phases; tokens accumulate; citations populated on complete |
   | `CitationCard.test.tsx` | Renders title, URL, source icon; highlight animation triggers |
   | `SourceIndicator.test.tsx` | Shows correct state for waiting/searching/done/error |
-- [ ] Setup CI-compatible test command: `npx vitest run`
+- [x] Setup CI-compatible test command: `npx vitest run`
 
 **Checkpoint:**
-- [ ] `npm run build` — zero errors
-- [ ] `docker build` — succeeds
-- [ ] `npx vitest run` — all tests pass
-- [ ] All tests run without backend dependency (mocked)
+- [x] `npm run build` — zero errors
+- [x] `docker build` — succeeds
+- [x] `npx vitest run` — all tests pass (42 tests across 6 files)
+- [x] All tests run without backend dependency (mocked)
 
 ---
 
@@ -303,28 +303,28 @@ The frontend is developed independently from the backend. Where the backend isn'
 
 **Goal:** Phase 1 complete. No rough edges. Ready to build on.
 
-- [ ] Fix any failing tests or visual bugs from the week
-- [ ] Test full flow with mock SSE and (if available) real backend
-- [ ] Ensure `SearchBar` → `ResearchView` transition animation is smooth
-- [ ] Review code: remove TODO comments, clean up unused imports
-- [ ] Verify dark mode one final time across all components
-- [ ] `npm run lint` — zero warnings
+- [x] Fix any failing tests or visual bugs from the week
+- [x] Test full flow with mock SSE and (if available) real backend
+- [x] Ensure `SearchBar` → `ResearchView` transition animation is smooth
+- [x] Review code: remove TODO comments, clean up unused imports
+- [x] Verify dark mode one final time across all components
+- [x] `npm run lint` — zero warnings
 
 **Checkpoint:**
-- [ ] Phase 1 exit criteria met (below)
+- [x] Phase 1 exit criteria met (below)
 
 ---
 
 ### Phase 1 Exit Criteria
 
-- [ ] All 7 days completed
-- [ ] Full research flow works: query → phases → sources → streamed answer → citations
-- [ ] Responsive on mobile (375px) through desktop (1440px)
-- [ ] Dark mode fully functional
-- [ ] Accessible: keyboard navigable, aria labels, reduced motion
-- [ ] Core hooks and components have unit tests
-- [ ] `npm run build` and `docker build` both pass
-- [ ] Works with mock SSE (no backend dependency for development)
+- [x] All 7 days completed
+- [x] Full research flow works: query → phases → sources → streamed answer → citations
+- [x] Responsive on mobile (375px) through desktop (1440px)
+- [x] Dark mode fully functional
+- [x] Accessible: keyboard navigable, aria labels, reduced motion
+- [x] Core hooks and components have unit tests
+- [x] `npm run build` and `docker build` both pass
+- [x] Works with mock SSE (no backend dependency for development)
 
 ---
 ---

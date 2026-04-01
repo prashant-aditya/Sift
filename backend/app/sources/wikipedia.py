@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 import httpx
+from urllib.parse import quote
 
 from app.sources.base import SourceAdapter, SourceResult
 
@@ -10,6 +12,11 @@ logger = logging.getLogger(__name__)
 
 _SEARCH_API = "https://en.wikipedia.org/w/api.php"
 _SUMMARY_API = "https://en.wikipedia.org/api/rest_v1/page/summary"
+_WIKIPEDIA_HEADERS = {
+    # Wikipedia API etiquette: send a descriptive UA with contact info.
+    "User-Agent": "SiftResearchEngine/0.1 (contact@example.com)",
+    "Accept": "application/json",
+}
 
 
 class WikipediaAdapter(SourceAdapter):
@@ -28,11 +35,13 @@ class WikipediaAdapter(SourceAdapter):
         return True
 
     async def search(
-        self, query: str, max_results: int | None = None
+        self, query: str, max_results: Optional[int] = None
     ) -> list[SourceResult]:
         limit = max_results or self.max_results
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_seconds, headers=_WIKIPEDIA_HEADERS
+            ) as client:
                 titles = await self._search_titles(client, query, limit)
                 return await self._fetch_summaries(client, titles)
         except httpx.TimeoutException:
@@ -64,7 +73,7 @@ class WikipediaAdapter(SourceAdapter):
     ) -> list[SourceResult]:
         results: list[SourceResult] = []
         for title in titles:
-            resp = await client.get(f"{_SUMMARY_API}/{title}")
+            resp = await client.get(f"{_SUMMARY_API}/{quote(title, safe='')}")
             if resp.status_code != 200:
                 continue
             data = resp.json()

@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from app.sources.base import SourceAdapter
 
@@ -19,7 +20,7 @@ class SourceRegistry:
         )
         self._adapters[adapter.name] = adapter
 
-    def get(self, name: str) -> SourceAdapter | None:
+    def get(self, name: str) -> Optional[SourceAdapter]:
         return self._adapters.get(name)
 
     def get_all(self) -> list[SourceAdapter]:

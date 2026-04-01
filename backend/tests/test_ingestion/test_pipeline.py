@@ -158,3 +158,34 @@ class TestPipelineEdgeCases:
         pipeline = IngestionPipeline(embedder=_fake_embedder())
         chunks = await pipeline.process([result])
         assert chunks == []
+
+
+class TestPipelineDeduplication:
+    @pytest.mark.asyncio
+    async def test_deduplicates_before_embedding_using_authority(self):
+        pytest.importorskip("datasketch")
+        # Two identical documents; wikipedia should win over duckduckgo.
+        content = (
+            "Sift runs extraction then deduplication then chunking then embedding "
+            "to reduce redundant documents."
+        )
+        wiki = _make_source_result(
+            title="Wiki Title",
+            url="https://example.com/wiki",
+            source_name="wikipedia",
+            raw_content=content,
+        )
+        ddg = _make_source_result(
+            title="DDG Title",
+            url="https://example.com/ddg",
+            source_name="duckduckgo",
+            raw_content=content,
+        )
+
+        embedder = _fake_embedder()
+        pipeline = IngestionPipeline(embedder=embedder)
+        chunks = await pipeline.process([ddg, wiki])
+
+        assert chunks
+        assert {c.source_name for c in chunks} == {"wikipedia"}
+        assert {c.source_title for c in chunks} == {"Wiki Title"}
