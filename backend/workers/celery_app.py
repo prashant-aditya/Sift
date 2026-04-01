@@ -32,6 +32,7 @@ celery_app.conf.update(
     task_routes={
         "workers.tasks.search_source": {"queue": "search"},
         "workers.callbacks.process_results": {"queue": "ingestion"},
+        "workers.tasks.refresh_research": {"queue": "ingestion"},
     },
 )
 

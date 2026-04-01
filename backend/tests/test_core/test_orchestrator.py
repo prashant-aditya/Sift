@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 
@@ -296,7 +297,7 @@ class TestResearchPipelineE2E:
         complete = next(e for e in events if e["event"] == "complete")
 
         assert "session_id" in complete["data"]
-        assert complete["data"]["session_id"].startswith("session_")
+        UUID(str(complete["data"]["session_id"]))
         assert isinstance(complete["data"]["citations"], list)
         assert len(complete["data"]["citations"]) > 0
         assert complete["data"]["sources_used"] > 0

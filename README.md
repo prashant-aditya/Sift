@@ -2032,19 +2032,19 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 #### Goal 2.5: Redis Caching Layer
 
-**Owner:** Backend Engineer | **Files:** `cache/redis_cache.py`, `cache/embedding_cache.py` | **Duration:** 2 days
+**Owner:** Backend Engineer | **Files:** `backend/app/cache/redis_cache.py`, `backend/app/cache/embedding_cache.py` | **Duration:** 2 days
 
-- [ ] **CP-2.5.1** Implement `ResearchCache` with two-tier caching:
+- [x] **CP-2.5.1** Implement `ResearchCache` with two-tier caching:
   - Tier 1: query hash → full synthesized result (TTL: 24h)
   - Tier 2: source + query hash → raw source results (TTL: 6h)
-- [ ] **CP-2.5.2** Implement stale-while-revalidate logic:
+- [x] **CP-2.5.2** Implement stale-while-revalidate logic:
   - Fresh hit (TTL > 20h) → return immediately
   - Stale hit (TTL ≤ 20h) → return stale + trigger background Celery refresh
   - Cache miss → full pipeline
-- [ ] **CP-2.5.3** Implement `hash_query()`: normalize (lowercase, strip, remove punctuation) → SHA-256
-- [ ] **CP-2.5.4** Implement `EmbeddingCache`: in-memory LRU (max 10K entries) via `cachetools.LRUCache`
-- [ ] **CP-2.5.5** Integrate caching into orchestrator: check cache before pipeline, store after completion
-- [ ] **CP-2.5.6** Write tests: fresh hit, stale hit + refresh trigger, miss, key normalization, embedding cache hit rate
+- [x] **CP-2.5.3** Implement `hash_query()`: normalize (lowercase, strip, remove punctuation) → SHA-256
+- [x] **CP-2.5.4** Implement `EmbeddingCache`: in-memory LRU (max 10K entries) via `cachetools.LRUCache`
+- [x] **CP-2.5.5** Integrate caching into orchestrator: check cache before pipeline, store after completion
+- [x] **CP-2.5.6** Write tests: fresh hit, stale hit + refresh trigger, miss, key normalization, embedding cache hit rate
 
 **Checkpoint Review:**
 - Repeat queries return in <300ms (cache hit)
@@ -2057,19 +2057,19 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `resilience/circuit_breaker.py`, `resilience/rate_limiter.py`, `resilience/retry.py` | **Duration:** 2 days
 
-- [ ] **CP-2.6.1** Implement `CircuitBreaker` (Redis-backed state machine):
+- [x] **CP-2.6.1** Implement `CircuitBreaker` (Redis-backed state machine):
   - States: CLOSED → OPEN (5 failures in 60s) → HALF_OPEN (after 30s cooldown) → CLOSED (test succeeds)
   - Redis keys: `cb:{source}:state`, `cb:{source}:failures`, `cb:{source}:last_fail`, `cb:{source}:opened_at`
   - Async context manager (`async with circuit_breaker:`)
-- [ ] **CP-2.6.2** Implement `TokenBucketRateLimiter` (Redis-backed):
+- [x] **CP-2.6.2** Implement `TokenBucketRateLimiter` (Redis-backed):
   - Per-source limits: DDG 1/sec burst 5, Reddit 0.5/sec burst 3, HN 2/sec burst 10, ArXiv 0.33/sec burst 3, Wikipedia 5/sec burst 20
   - `acquire()` method with timeout
-- [ ] **CP-2.6.3** Implement `with_retry` decorator:
+- [x] **CP-2.6.3** Implement `with_retry` decorator:
   - Exponential backoff: `backoff_base * 2^attempt` (1s, 2s, 4s...)
   - Jitter: +-20% to avoid thundering herd
   - Max 2 retries by default
-- [ ] **CP-2.6.4** Integrate all three into Celery source search tasks: `async with circuit_breaker: await rate_limiter.acquire(); adapter.search()`
-- [ ] **CP-2.6.5** Write tests: CB opens after N failures, CB half-open transition, CB recovery, rate limiter blocking/refill, retry backoff timing, retry gives up
+- [x] **CP-2.6.4** Integrate all three into Celery source search tasks: `async with circuit_breaker: await rate_limiter.acquire(); adapter.search()`
+- [x] **CP-2.6.5** Write tests: CB opens after N failures, CB half-open transition, CB recovery, rate limiter blocking/refill, retry backoff timing, retry gives up
 
 **Checkpoint Review:**
 - One source failing does not affect other sources
@@ -2096,20 +2096,20 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `db/models.py`, `db/session.py`, `api/routes/sessions.py` | **Duration:** 2 days
 
-- [ ] **CP-2.7.1** Add dependencies: `sqlalchemy[asyncio]`, `asyncpg`, `alembic`
-- [ ] **CP-2.7.2** Define SQLAlchemy models: `User`, `ResearchSession`, `ResearchTurn`, `SourceCache`
+- [x] **CP-2.7.1** Add dependencies: `sqlalchemy[asyncio]`, `asyncpg`, `alembic`
+- [x] **CP-2.7.2** Define SQLAlchemy models: `User`, `ResearchSession`, `ResearchTurn`, `SourceCache`
   - All models include `created_at` and `updated_at` timestamps
   - UUIDs for user-facing IDs
   - Foreign keys and proper indexes
-- [ ] **CP-2.7.3** Set up Alembic: `alembic init migrations`, configure async engine, generate initial migration
-- [ ] **CP-2.7.4** Implement async session management: `get_db()` dependency with `async_sessionmaker`
-- [ ] **CP-2.7.5** Implement session CRUD endpoints:
+- [x] **CP-2.7.3** Set up Alembic: `alembic init migrations`, configure async engine, generate initial migration
+- [x] **CP-2.7.4** Implement async session management: `get_db()` dependency with `async_sessionmaker`
+- [x] **CP-2.7.5** Implement session CRUD endpoints:
   - `GET /api/v1/sessions` — list (paginated, sorted by `updated_at`)
   - `GET /api/v1/sessions/{id}` — get with all turns
   - `PATCH /api/v1/sessions/{id}` — rename
   - `DELETE /api/v1/sessions/{id}` — soft-delete (status=archived)
-- [ ] **CP-2.7.6** Update orchestrator to persist: create `ResearchSession` on first query, create `ResearchTurn` per query
-- [ ] **CP-2.7.7** Write tests: session create/retrieve/list/archive, turn creation and ordering, pagination
+- [x] **CP-2.7.6** Update orchestrator to persist: create `ResearchSession` on first query, create `ResearchTurn` per query
+- [x] **CP-2.7.7** Write tests: session create/retrieve/list/archive, turn creation and ordering, pagination
 
 **Checkpoint Review:**
 - Research sessions persisted to PostgreSQL (Supabase)
@@ -2122,17 +2122,17 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Lead | **Files:** `core/context_manager.py`, `api/routes/research.py` (update) | **Duration:** 2 days
 
-- [ ] **CP-2.8.1** Implement `ContextManager`:
+- [x] **CP-2.8.1** Implement `ContextManager`:
   - `build_context(session_id)` — load all turns for a session
   - If total turns fit in 4096 token budget → return full context
   - Else → compress older turns via LLM summary, keep last 2 turns full
   - Summary preserves: key findings, citations, contradictions, preferences
   - Cache compressed context in the turn record
-- [ ] **CP-2.8.2** Implement follow-up endpoint: `POST /api/v1/research/{session_id}/followup`
+- [x] **CP-2.8.2** Implement follow-up endpoint: `POST /api/v1/research/{session_id}/followup`
   - Augment follow-up query with session context
   - Store new chunks in same session's ChromaDB collection
   - Retrieve from session's full chunk corpus
-- [ ] **CP-2.8.3** Write tests: context building with 1/5/10 turns, compression triggers, follow-up retrieves from full corpus
+- [x] **CP-2.8.3** Write tests: context building with 1/5/10 turns, compression triggers, follow-up retrieves from full corpus
 
 **Checkpoint Review:**
 - Users can ask follow-up questions within a session
@@ -2145,18 +2145,18 @@ Deliverable:            Deliverable:            Deliverable:            Delivera
 
 **Owner:** Backend Engineer | **Files:** `sources/reddit.py`, `sources/arxiv.py` | **Duration:** 2 days
 
-- [ ] **CP-2.9.1** Implement `RedditAdapter`:
+- [x] **CP-2.9.1** Implement `RedditAdapter`:
   - Reddit JSON API (append `.json`), User-Agent header required
   - Target subreddits: r/programming, r/devops, r/machinelearning, r/Python, r/ExperiencedDevs
   - Extract: post title, selftext, top 5 comments by score
   - Rate limit: 1 request per 2 seconds
-- [ ] **CP-2.9.2** Implement `ArXivAdapter`:
+- [x] **CP-2.9.2** Implement `ArXivAdapter`:
   - ArXiv API via `feedparser` for Atom XML parsing
   - Extract: title, authors, abstract, published date, PDF URL
   - Abstract as raw_content (full paper text is Phase 3+)
   - Rate limit: 1 request per 3 seconds
-- [ ] **CP-2.9.3** Register both in `SourceRegistry`
-- [ ] **CP-2.9.4** Write tests per adapter: valid response, empty results, timeout, rate limit, malformed response
+- [x] **CP-2.9.3** Register both in `SourceRegistry`
+- [x] **CP-2.9.4** Write tests per adapter: valid response, empty results, timeout, rate limit, malformed response
 
 **Checkpoint Review:**
 - Reddit and ArXiv searchable as sources

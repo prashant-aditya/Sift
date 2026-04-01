@@ -6,9 +6,14 @@ eval-type-backport==0.2.2
 httpx==0.28.1
 python-dotenv==1.2.1
 sse-starlette==3.3.0
+sqlalchemy[asyncio]==2.0.43
+asyncpg==0.30.0
+alembic==1.16.5
+aiosqlite==0.21.0
+feedparser==6.0.12
 chromadb==1.5.2
 google-genai==1.47.0
-ddgs==9.12.0
+ddgs==9.8.0
 beautifulsoup4==4.13.3
 readability-lxml==0.8.1
 lxml_html_clean==0.4.1
@@ -17,3 +22,4 @@ sentence-transformers==4.1.0
 datasketch==1.9.0
 celery[redis]==5.5.3
 redis==6.4.0
+cachetools==5.5.2

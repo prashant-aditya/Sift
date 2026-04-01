@@ -19,22 +19,28 @@ except Exception:  # pragma: no cover
 
 
 _WHITESPACE_RE = re.compile(r"\s+")
+_NONWORD_RE = re.compile(r"[^\w\s]", flags=re.UNICODE)
 
 
 def _normalize_text(text: str) -> str:
     text = text.lower().strip()
+    text = _NONWORD_RE.sub(" ", text)
     text = _WHITESPACE_RE.sub(" ", text)
     return text
 
 
-def _word_3grams(text: str) -> list[str]:
+def _char_3grams(text: str) -> list[str]:
+    """Character 3-grams over normalized text.
+
+    This is intentionally character-based (not word-based) to remain robust to
+    small insertions/deletions that would otherwise shift most word n-grams.
+    """
     normalized = _normalize_text(text)
-    tokens = [t for t in normalized.split(" ") if t]
-    if not tokens:
+    if not normalized:
         return []
-    if len(tokens) < 3:
-        return [" ".join(tokens)]
-    return [" ".join(tokens[i : i + 3]) for i in range(len(tokens) - 2)]
+    if len(normalized) <= 3:
+        return [normalized]
+    return [normalized[i : i + 3] for i in range(len(normalized) - 2)]
 
 
 @dataclass(frozen=True)
@@ -90,7 +96,7 @@ class MinHashDeduplicator:
         if MinHash is None:  # pragma: no cover
             raise RuntimeError("datasketch is not installed")
         m = MinHash(num_perm=self._num_perm)
-        for shingle in _word_3grams(text):
+        for shingle in _char_3grams(text):
             m.update(shingle.encode("utf-8"))
         return m
 

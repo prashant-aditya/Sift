@@ -15,6 +15,7 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI
@@ -236,7 +237,7 @@ class TestResearchValidRequest:
         complete = next(e for e in events if e["event"] == "complete")
 
         assert "session_id" in complete["data"]
-        assert complete["data"]["session_id"].startswith("session_")
+        UUID(str(complete["data"]["session_id"]))
 
 
 # ======================================================================

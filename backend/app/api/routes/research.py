@@ -7,12 +7,16 @@ LLM synthesis.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Literal, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.context_manager import ContextManager
 from app.core.orchestrator import ResearchOrchestrator
 
 router = APIRouter(prefix="/api/v1", tags=["research"])
@@ -53,6 +57,38 @@ def _build_orchestrator(request: Request) -> ResearchOrchestrator:
         embedder=state.embedder,
         synthesizer=state.synthesizer,
         celery_app=getattr(state, "celery_app", None),
+        cache=getattr(state, "research_cache", None),
+        db_sessionmaker=getattr(state, "db_sessionmaker", None),
+    )
+
+
+def _require_sessionmaker(request: Request) -> async_sessionmaker[AsyncSession]:
+    sm = getattr(request.app.state, "db_sessionmaker", None)
+    if sm is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not configured",
+        )
+    return sm
+
+
+async def _db(request: Request) -> AsyncIterator[AsyncSession]:
+    sm = _require_sessionmaker(request)
+    async with sm() as session:
+        yield session
+
+
+class FollowupRequest(BaseModel):
+    """Validated request body for a follow-up query within a session."""
+
+    query: str = Field(..., min_length=3, max_length=2000)
+    sources: Optional[list[str]] = Field(
+        default=None,
+        description="Source adapter names to search. None uses all available.",
+    )
+    depth: Literal["quick", "standard", "deep"] = Field(
+        default="standard",
+        description="Controls max results per source and retrieval depth.",
     )
 
 
@@ -70,4 +106,32 @@ async def research(body: ResearchRequest, request: Request) -> EventSourceRespon
     orchestrator = _build_orchestrator(request)
     return EventSourceResponse(
         orchestrator.research(body.query, body.sources, body.depth),
+    )
+
+
+@router.post("/research/{session_id}/followup")
+async def followup(
+    session_id: UUID,
+    body: FollowupRequest,
+    request: Request,
+    db: AsyncSession = Depends(_db),
+) -> EventSourceResponse:
+    orchestrator = _build_orchestrator(request)
+    context_manager: ContextManager = getattr(request.app.state, "context_manager", None) or ContextManager()
+
+    context = await context_manager.build_context(str(session_id), db)
+    augmented_query = (
+        "Previous research context:\n"
+        f"{context}\n\n"
+        f"Follow-up question: {body.query}"
+    )
+
+    return EventSourceResponse(
+        orchestrator.followup(
+            session_id=str(session_id),
+            query=body.query,
+            augmented_query=augmented_query,
+            sources=body.sources,
+            depth=body.depth,
+        )
     )

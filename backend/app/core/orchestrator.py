@@ -10,10 +10,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any, Optional
+from uuid import UUID
 
+from app.cache.redis_cache import ResearchCache
 from app.core.query_analyzer import QueryAnalyzer
 from app.core.synthesizer import Synthesizer
 from app.db.vector_store import VectorStore
@@ -100,6 +103,8 @@ class ResearchOrchestrator:
         synthesizer: Synthesizer,
         retriever: HybridRetriever | None = None,
         celery_app: Any | None = None,
+        cache: ResearchCache | None = None,
+        db_sessionmaker: Any | None = None,
     ) -> None:
         self._query_analyzer = query_analyzer
         self._source_registry = source_registry
@@ -108,9 +113,103 @@ class ResearchOrchestrator:
         self._embedder = embedder
         self._synthesizer = synthesizer
         self._celery_app = celery_app
+        self._cache = cache
+        self._db_sessionmaker = db_sessionmaker
         self._retriever = retriever or HybridRetriever(
             dense=DenseRetriever(vector_store=vector_store, embedder=embedder)
         )
+
+    async def _persist_session(self, session_id: str) -> None:
+        if self._db_sessionmaker is None:
+            return
+        try:
+            from sqlalchemy import select
+
+            from app.db.models import ResearchSession
+
+            sid = UUID(session_id)
+            async with self._db_sessionmaker() as db:
+                existing = (await db.execute(select(ResearchSession).where(ResearchSession.id == sid))).scalar_one_or_none()
+                if existing is None:
+                    db.add(ResearchSession(id=sid))
+                    await db.commit()
+        except Exception:
+            logger.exception("Failed to persist research session")
+
+    async def _persist_turn(
+        self,
+        *,
+        session_id: str,
+        query: str,
+        answer: str,
+        citations: list[dict[str, Any]],
+        metrics: dict[str, Any],
+    ) -> None:
+        if self._db_sessionmaker is None:
+            return
+        try:
+            from app.db.models import ResearchTurn
+
+            sid = UUID(session_id)
+            async with self._db_sessionmaker() as db:
+                db.add(
+                    ResearchTurn(
+                        id=uuid.uuid4(),
+                        session_id=sid,
+                        query=query,
+                        answer=answer,
+                        citations=citations,
+                        metrics=metrics,
+                    )
+                )
+                await db.commit()
+        except Exception:
+            logger.exception("Failed to persist research turn")
+
+    async def followup(
+        self,
+        *,
+        session_id: str,
+        query: str,
+        augmented_query: str,
+        sources: Optional[list[str]] = None,
+        depth: str = "standard",
+    ) -> AsyncGenerator[dict[str, str], None]:
+        """Run the research pipeline for an existing session (follow-up).
+
+        Differences vs ``research``:
+        - Uses the existing *session_id* (reuses the session-scoped Chroma collection)
+        - Skips Tier-1 cache (the augmented query is inherently session-specific)
+        - Persists the turn with the *original* query, while using *augmented_query*
+          for retrieval/synthesis.
+        """
+        await self._persist_session(session_id)
+        async for ev in self._run_pipeline(
+            session_id=session_id,
+            query=query,
+            pipeline_query=augmented_query,
+            sources=sources,
+            depth=depth,
+            enable_cache=False,
+        ):
+            yield ev
+
+    async def _stream_cached_result(
+        self, *, session_id: str, cached: dict[str, Any]
+    ) -> AsyncGenerator[dict[str, str], None]:
+        yield _sse_event("status", {"phase": "cached", "session_id": session_id})
+        answer = str(cached.get("answer") or "")
+        if answer:
+            yield _sse_event("token", {"content": answer})
+
+        complete_data: dict[str, Any] = {
+            "session_id": session_id,
+            "sources_used": int(cached.get("sources_used") or 0),
+            "citations": cached.get("citations") or [],
+        }
+        if cached.get("errors"):
+            complete_data["errors"] = cached["errors"]
+        yield _sse_event("complete", complete_data)
 
     async def research(
         self,
@@ -133,12 +232,102 @@ class ResearchOrchestrator:
         6. Stream synthesis via LLM
         7. Yield completion event with ``session_id`` and citations
         """
+        session_id = str(uuid.uuid4())
+        await self._persist_session(session_id)
+        async for ev in self._run_pipeline(
+            session_id=session_id,
+            query=query,
+            pipeline_query=query,
+            sources=sources,
+            depth=depth,
+            enable_cache=True,
+        ):
+            yield ev
+
+    async def _run_pipeline(
+        self,
+        *,
+        session_id: str,
+        query: str,
+        pipeline_query: str,
+        sources: Optional[list[str]],
+        depth: str,
+        enable_cache: bool,
+    ) -> AsyncGenerator[dict[str, str], None]:
         config = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["standard"])
-        session_id = f"session_{uuid.uuid4().hex[:12]}"
+        query_hash = ResearchCache.hash_query(pipeline_query)
+        start = time.perf_counter()
+
+        # --- Cache check (Tier 1) ---
+        if enable_cache and self._cache is not None:
+            try:
+                cache_result = await self._cache.get_research(query_hash)
+            except Exception:
+                cache_result = None
+
+            if cache_result is not None and cache_result.is_fresh:
+                cached_citations = cache_result.data.get("citations") or []
+                cached_answer = str(cache_result.data.get("answer") or "")
+                cached_sources_used = int(cache_result.data.get("sources_used") or 0)
+                await self._persist_turn(
+                    session_id=session_id,
+                    query=query,
+                    answer=cached_answer,
+                    citations=cached_citations,
+                    metrics={
+                        "depth": depth,
+                        "cached": True,
+                        "sources_used": cached_sources_used,
+                        "duration_ms": int((time.perf_counter() - start) * 1000),
+                    },
+                )
+                async for ev in self._stream_cached_result(
+                    session_id=session_id, cached=cache_result.data
+                ):
+                    yield ev
+                return
+
+            if cache_result is not None and not cache_result.is_fresh:
+                cached_citations = cache_result.data.get("citations") or []
+                cached_answer = str(cache_result.data.get("answer") or "")
+                cached_sources_used = int(cache_result.data.get("sources_used") or 0)
+                await self._persist_turn(
+                    session_id=session_id,
+                    query=query,
+                    answer=cached_answer,
+                    citations=cached_citations,
+                    metrics={
+                        "depth": depth,
+                        "cached": True,
+                        "stale": True,
+                        "sources_used": cached_sources_used,
+                        "duration_ms": int((time.perf_counter() - start) * 1000),
+                    },
+                )
+                async for ev in self._stream_cached_result(
+                    session_id=session_id, cached=cache_result.data
+                ):
+                    yield ev
+
+                if self._celery_app is not None:
+                    try:
+                        self._celery_app.signature(
+                            "workers.tasks.refresh_research",
+                            kwargs={
+                                "query_hash": query_hash,
+                                "query": pipeline_query,
+                                "sources": sources,
+                                "depth": depth,
+                            },
+                            queue="ingestion",
+                        ).apply_async()
+                    except Exception:
+                        logger.exception("Failed to enqueue cache refresh")
+                return
 
         # --- Step 1: Analyze query → sub-queries ---
         yield _sse_event("status", {"phase": "decomposing", "session_id": session_id})
-        sub_queries = await self._query_analyzer.decompose(query)
+        sub_queries = await self._query_analyzer.decompose(pipeline_query)
         yield _sse_event("status", {
             "phase": "decomposed",
             "sub_queries": sub_queries,
@@ -147,6 +336,19 @@ class ResearchOrchestrator:
         # --- Step 2: Fan-out searches across sources ---
         adapters = self._resolve_adapters(sources)
         if not adapters:
+            await self._persist_turn(
+                session_id=session_id,
+                query=query,
+                answer="",
+                citations=[],
+                metrics={
+                    "depth": depth,
+                    "cached": False,
+                    "sources_used": 0,
+                    "errors": ["No available sources"],
+                    "duration_ms": int((time.perf_counter() - start) * 1000),
+                },
+            )
             yield _sse_event("complete", {
                 "session_id": session_id,
                 "sources_used": 0,
@@ -176,6 +378,19 @@ class ResearchOrchestrator:
             })
 
         if (sources_used or len(flat_results)) == 0:
+            await self._persist_turn(
+                session_id=session_id,
+                query=query,
+                answer="",
+                citations=[],
+                metrics={
+                    "depth": depth,
+                    "cached": False,
+                    "sources_used": 0,
+                    "errors": source_errors or None,
+                    "duration_ms": int((time.perf_counter() - start) * 1000),
+                },
+            )
             yield _sse_event("complete", {
                 "session_id": session_id,
                 "sources_used": 0,
@@ -193,6 +408,19 @@ class ResearchOrchestrator:
             chunks = await self._ingestion_pipeline.process(flat_results)
 
             if not chunks:
+                await self._persist_turn(
+                    session_id=session_id,
+                    query=query,
+                    answer="",
+                    citations=[],
+                    metrics={
+                        "depth": depth,
+                        "cached": False,
+                        "sources_used": len(flat_results),
+                        "chunks_count": 0,
+                        "duration_ms": int((time.perf_counter() - start) * 1000),
+                    },
+                )
                 yield _sse_event("complete", {
                     "session_id": session_id,
                     "sources_used": len(flat_results),
@@ -207,8 +435,6 @@ class ResearchOrchestrator:
             )
             logger.info("Stored %d chunks for session %s", upserted, session_id)
         else:
-            # We can't stream worker-side progress; emit phases once to preserve
-            # the frontend's expected phase sequence.
             yield _sse_event(
                 "status",
                 {"phase": "processing", "results_count": sources_used or len(flat_results)},
@@ -218,7 +444,7 @@ class ResearchOrchestrator:
         # --- Step 5: Retrieve top-K via hybrid retrieval (BM25 + dense) ---
         yield _sse_event("status", {"phase": "retrieving"})
         relevant = await self._retriever.retrieve(
-            query=query,
+            query=pipeline_query,
             session_id=session_id,
             chunks=chunks,
             top_k=config["retrieval_top_k"],
@@ -226,7 +452,9 @@ class ResearchOrchestrator:
 
         # --- Step 6: Stream synthesis via LLM ---
         yield _sse_event("status", {"phase": "synthesizing"})
-        async for token in self._synthesizer.synthesize(query, relevant):
+        full_answer = ""
+        async for token in self._synthesizer.synthesize(pipeline_query, relevant):
+            full_answer += token
             yield _sse_event("token", {"content": token})
 
         # --- Step 7: Complete ---
@@ -239,6 +467,42 @@ class ResearchOrchestrator:
         if source_errors:
             complete_data["errors"] = source_errors
         yield _sse_event("complete", complete_data)
+        await self._persist_turn(
+            session_id=session_id,
+            query=query,
+            answer=full_answer,
+            citations=citations,
+            metrics={
+                "depth": depth,
+                "cached": False,
+                "sources_used": sources_used or len(flat_results),
+                "chunks_count": len(chunks),
+                "errors": source_errors or None,
+                "duration_ms": int((time.perf_counter() - start) * 1000),
+                "pipeline_query_augmented": pipeline_query != query,
+            },
+        )
+
+        # --- Cache store (Tier 1 + Tier 2) ---
+        if enable_cache and self._cache is not None:
+            try:
+                await self._cache.set_research(
+                    query_hash,
+                    {
+                        "answer": full_answer,
+                        "citations": citations,
+                        "sources_used": sources_used or len(flat_results),
+                        "errors": source_errors or None,
+                    },
+                )
+
+                by_source: dict[str, list[dict[str, Any]]] = {}
+                for r in flat_results:
+                    by_source.setdefault(r.source_name, []).append(r.model_dump())
+                for src, data in by_source.items():
+                    await self._cache.set_source_results(src, query_hash, data)
+            except Exception:
+                logger.exception("Failed to write research cache")
 
     # ------------------------------------------------------------------
     # Internal helpers

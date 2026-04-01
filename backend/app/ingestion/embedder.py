@@ -9,6 +9,8 @@ from typing import Optional
 import httpx
 import numpy as np
 
+from app.cache.embedding_cache import EmbeddingCache
+
 logger = logging.getLogger(__name__)
 
 _HF_FEATURE_EXTRACTION_URL = (
@@ -40,11 +42,13 @@ class EmbeddingGenerator:
         self,
         hf_api_token: str = "",
         model_name: str = "all-MiniLM-L6-v2",
+        embedding_cache: EmbeddingCache | None = None,
     ) -> None:
         self._hf_api_token = hf_api_token
         self._model_name = model_name
         self._api_url = _HF_FEATURE_EXTRACTION_URL.format(model=model_name)
         self._local_model: Optional[object] = None  # lazy-loaded SentenceTransformer
+        self._cache = embedding_cache
 
     # ------------------------------------------------------------------
     # Public API
@@ -55,6 +59,23 @@ class EmbeddingGenerator:
         if not texts:
             return []
 
+        if self._cache is not None:
+            cached: list[list[float] | None] = [self._cache.get(t) for t in texts]
+            missing_texts = [t for t, emb in zip(texts, cached) if emb is None]
+            if missing_texts:
+                new_embeddings = await self._embed_texts_uncached(missing_texts)
+                it = iter(new_embeddings)
+                for idx, emb in enumerate(cached):
+                    if emb is None:
+                        generated = next(it)
+                        cached[idx] = generated
+                        self._cache.set(texts[idx], generated)
+            # mypy: all filled
+            return [e for e in cached if e is not None]
+
+        return await self._embed_texts_uncached(texts)
+
+    async def _embed_texts_uncached(self, texts: list[str]) -> list[list[float]]:
         all_embeddings: list[list[float]] = []
         for start in range(0, len(texts), BATCH_SIZE):
             batch = texts[start : start + BATCH_SIZE]

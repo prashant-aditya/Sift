@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
 
     chroma_persist_dir: str = "./chroma_data"
+    redis_url: str = "redis://redis:6379/1"
+    database_url: str = "sqlite+aiosqlite:///./sift.db"
 
     max_sources_per_query: int = 5
     chunk_size: int = 512
