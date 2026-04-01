@@ -6,6 +6,7 @@ import {
   useRef,
   useEffect,
   forwardRef,
+  useMemo,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -20,7 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SourceToggle } from "./SourceToggle";
-import { SOURCES, RESEARCH_DEPTHS } from "@/lib/constants";
+import { RESEARCH_DEPTHS } from "@/lib/constants";
+import { useSources } from "@/hooks/useSources";
 import type { ResearchDepth } from "@/types/research";
 
 interface SearchBarProps {
@@ -35,17 +37,32 @@ const CHAR_COUNT_THRESHOLD = 1900;
 
 export const SearchBar = forwardRef<HTMLTextAreaElement, SearchBarProps>(
   function SearchBar({ onSubmit, isStreaming = false, defaultSources }, ref) {
+    const { sources } = useSources();
+    const availableSourceNames = useMemo(
+      () => new Set(sources.map((s) => s.name)),
+      [sources],
+    );
     const [query, setQuery] = useState("");
     const [activeSources, setActiveSources] = useState<Set<string>>(
-      () => new Set(defaultSources ?? SOURCES.map((s) => s.name)),
+      () => new Set(defaultSources ?? sources.map((s) => s.name)),
     );
     const [depth, setDepth] = useState<ResearchDepth>("standard");
     const internalRef = useRef<HTMLTextAreaElement>(null);
     const textareaRef = (ref as React.RefObject<HTMLTextAreaElement>) ?? internalRef;
 
+    const effectiveActiveSources = useMemo(() => {
+      if (defaultSources && defaultSources.length > 0) {
+        return defaultSources.filter((s) => availableSourceNames.has(s));
+      }
+      const selected = Array.from(activeSources).filter((s) =>
+        availableSourceNames.has(s),
+      );
+      return selected.length > 0 ? selected : Array.from(availableSourceNames);
+    }, [defaultSources, activeSources, availableSourceNames]);
+
     const canSubmit =
       query.trim().length >= MIN_CHARS &&
-      activeSources.size > 0 &&
+      effectiveActiveSources.length > 0 &&
       !isStreaming;
 
     useEffect(() => {
@@ -71,9 +88,9 @@ export const SearchBar = forwardRef<HTMLTextAreaElement, SearchBarProps>(
       (e?: FormEvent) => {
         e?.preventDefault();
         if (!canSubmit) return;
-        onSubmit(query.trim(), Array.from(activeSources), depth);
+        onSubmit(query.trim(), effectiveActiveSources, depth);
       },
-      [canSubmit, query, activeSources, depth, onSubmit],
+      [canSubmit, query, effectiveActiveSources, depth, onSubmit],
     );
 
     const handleKeyDown = useCallback(
@@ -141,11 +158,11 @@ export const SearchBar = forwardRef<HTMLTextAreaElement, SearchBarProps>(
           role="group"
           aria-label="Research sources"
         >
-          {SOURCES.map((source) => (
+          {sources.map((source) => (
             <SourceToggle
               key={source.name}
               source={source}
-              active={activeSources.has(source.name)}
+              active={effectiveActiveSources.includes(source.name)}
               onToggle={handleToggle}
               disabled={isStreaming}
             />

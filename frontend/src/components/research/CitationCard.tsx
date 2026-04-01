@@ -16,13 +16,14 @@ export const CitationCard = forwardRef<HTMLAnchorElement, CitationCardProps>(
     const sourceConfig = SOURCE_MAP[citation.source_name];
     const Icon = sourceConfig?.icon;
     const relevancePercent = Math.round(citation.relevance_score * 100);
+    const href = citation.url?.trim() || undefined;
 
     return (
       <a
         ref={ref}
-        href={citation.url}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={href}
+        target={href ? "_blank" : undefined}
+        rel={href ? "noopener noreferrer" : undefined}
         className={cn(
           "group block rounded-lg border p-3 transition-all duration-200",
           "min-h-[44px]",
@@ -31,14 +32,21 @@ export const CitationCard = forwardRef<HTMLAnchorElement, CitationCardProps>(
           isHighlighted
             ? "animate-citation-highlight border-primary/60 bg-primary/5 shadow-sm ring-1 ring-primary/20 motion-reduce:border-primary motion-reduce:ring-2 motion-reduce:ring-primary/40"
             : "border-border bg-card",
+          !href && "cursor-default opacity-70",
         )}
         aria-label={`Source ${citation.id}: ${citation.title}`}
+        aria-disabled={!href}
+        onClick={(event) => {
+          if (!href) event.preventDefault();
+        }}
       >
         <div className="flex items-start gap-2.5">
           <span
             className={cn(
-              "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white",
-              sourceConfig?.bgClass ?? "bg-primary",
+              "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+              sourceConfig?.bgClass
+                ? `${sourceConfig.bgClass} text-white`
+                : "bg-primary text-primary-foreground",
             )}
             aria-hidden="true"
           >
@@ -68,7 +76,9 @@ export const CitationCard = forwardRef<HTMLAnchorElement, CitationCardProps>(
                 className="size-3 shrink-0 opacity-50"
                 aria-hidden="true"
               />
-              <span className="truncate">{truncateUrl(citation.url, 40)}</span>
+              <span className="truncate">
+                {truncateUrl(citation.url, 40) || "Link unavailable"}
+              </span>
             </div>
 
             <div className="pt-0.5">

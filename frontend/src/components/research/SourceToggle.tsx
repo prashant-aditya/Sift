@@ -22,7 +22,6 @@ export function SourceToggle({
     <button
       type="button"
       role="switch"
-      aria-pressed={active}
       aria-checked={active}
       aria-label={`Toggle ${source.displayName} source`}
       disabled={disabled}

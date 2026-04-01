@@ -19,7 +19,7 @@ export interface SourceConfig {
 
 export const SOURCES: SourceConfig[] = [
   {
-    name: "ddg",
+    name: "duckduckgo",
     displayName: "DuckDuckGo",
     icon: Globe,
     color: "#f97316",

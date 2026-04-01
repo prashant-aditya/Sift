@@ -1,17 +1,22 @@
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Syne, Syne_Mono, Cormorant_Garamond } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppShell } from "@/components/layout/AppShell";
 import "./globals.css";
+import "./sift-v2.css";
 
-const inter = Inter({
-  variable: "--font-sans",
+const syne = Syne({ variable: "--font-sans", subsets: ["latin"] });
+const syneMono = Syne_Mono({
+  variable: "--font-sift-mono",
   subsets: ["latin"],
+  weight: "400",
 });
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const cormorant = Cormorant_Garamond({
+  variable: "--font-sift-serif",
   subsets: ["latin"],
+  weight: ["300", "400", "600"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -28,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${geistMono.variable} antialiased`}
+        className={`${syne.variable} ${syneMono.variable} ${cormorant.variable} antialiased`}
       >
         <ThemeProvider
           attribute="class"
@@ -37,7 +42,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider delay={300}>
-            {children}
+            <AppShell>{children}</AppShell>
           </TooltipProvider>
         </ThemeProvider>
       </body>

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useSSE } from "./useSSE";
 import { sseUrl } from "@/lib/api";
-import { SOURCES } from "@/lib/constants";
+import { SOURCE_MAP, SOURCES } from "@/lib/constants";
 import type {
   ResearchPhase,
   ResearchDepth,
@@ -36,12 +36,21 @@ interface UseResearchReturn {
   reset: () => void;
 }
 
+function normalizeSourceName(name: string): string {
+  const n = name.trim().toLowerCase();
+  if (n === "ddg") return "duckduckgo";
+  if (n === "hn") return "hackernews";
+  if (n === "wiki") return "wikipedia";
+  return n;
+}
+
 function buildInitialSourceStatuses(sourceNames: string[]): SourceStatus[] {
   return sourceNames.map((name) => {
-    const config = SOURCES.find((s) => s.name === name);
+    const normalized = normalizeSourceName(name);
+    const config = SOURCE_MAP[normalized] ?? SOURCES.find((s) => s.name === normalized);
     return {
-      name,
-      displayName: config?.displayName ?? name,
+      name: normalized,
+      displayName: config?.displayName ?? normalized,
       status: "waiting" as const,
     };
   });
@@ -172,20 +181,12 @@ export function useResearch(): UseResearchReturn {
     [],
   );
 
-  const sseBodyRef = useRef<unknown>(null);
-  const sseUrlRef = useRef("");
-
   const { start: sseStart, abort: sseAbort, isConnected } = useSSE({
-    url: sseUrlRef.current,
+    url: "",
     method: "POST",
-    body: sseBodyRef.current,
     onEvent: handleEvent,
     onOpen: () => setPhase("decomposing"),
-    onClose: () => {
-      if (phase !== "complete" && phase !== "error") {
-        // Stream ended without explicit complete/error — leave as-is
-      }
-    },
+    onClose: () => {},
   });
 
   const resetState = useCallback(() => {
@@ -207,10 +208,10 @@ export function useResearch(): UseResearchReturn {
       setSourceStatuses(buildInitialSourceStatuses(sources));
       setPhase("decomposing");
 
-      sseUrlRef.current = sseUrl("/api/v1/research");
-      sseBodyRef.current = { query, sources, depth };
-
-      setTimeout(() => sseStart(), 0);
+      sseStart({
+        url: sseUrl("/api/v1/research"),
+        body: { query, sources, depth },
+      });
     },
     [sseStart, sseAbort, resetState],
   );
@@ -226,10 +227,10 @@ export function useResearch(): UseResearchReturn {
       tokensRef.current = "";
       setPhase("decomposing");
 
-      sseUrlRef.current = sseUrl(`/api/v1/research/${sid}/followup`);
-      sseBodyRef.current = { query };
-
-      setTimeout(() => sseStart(), 0);
+      sseStart({
+        url: sseUrl(`/api/v1/research/${sid}/followup`),
+        body: { query },
+      });
     },
     [sseStart, sseAbort],
   );

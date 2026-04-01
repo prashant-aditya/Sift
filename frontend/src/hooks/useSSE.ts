@@ -16,7 +16,7 @@ interface UseSSEOptions {
 }
 
 interface UseSSEReturn {
-  start: () => void;
+  start: (overrides?: Partial<Pick<UseSSEOptions, "url" | "body">>) => void;
   abort: () => void;
   isConnected: boolean;
   error: Error | null;
@@ -52,15 +52,18 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
 
       let res: Response;
       if (shouldUseMock()) {
-        res = createMockResponse(body);
+        res = createMockResponse();
       } else {
         res = await fetch(url, {
           method,
           headers: {
             "Content-Type": "application/json",
+            Accept: "text/event-stream",
             ...headers,
           },
           body: body ? JSON.stringify(body) : undefined,
+          cache: "no-store",
+          credentials: "include",
           signal: controller.signal,
         });
       }
@@ -124,10 +127,16 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
     }
   }, []);
 
-  const start = useCallback(() => {
-    retryCountRef.current = 0;
-    connect();
-  }, [connect]);
+  const start = useCallback(
+    (overrides?: Partial<Pick<UseSSEOptions, "url" | "body">>) => {
+      if (overrides) {
+        optionsRef.current = { ...optionsRef.current, ...overrides };
+      }
+      retryCountRef.current = 0;
+      connect();
+    },
+    [connect],
+  );
 
   const abort = useCallback(() => {
     abortRef.current?.abort();

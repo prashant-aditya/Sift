@@ -37,7 +37,7 @@ const MOCK_CITATIONS: Citation[] = [
     id: 5,
     title: "Introduction to Neural Networks",
     url: "https://example.com/neural-networks",
-    source_name: "ddg",
+    source_name: "duckduckgo",
     relevance_score: 0.75,
   },
 ];
@@ -153,9 +153,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function* generateMockEvents(
-  _body: unknown,
-): AsyncGenerator<string> {
+async function* generateMockEvents(): AsyncGenerator<string> {
   yield formatSSE("status", {
     phase: "decomposing",
     message: "Analyzing your query and breaking it into sub-questions...",
@@ -170,7 +168,7 @@ async function* generateMockEvents(
   await sleep(400);
 
   const sources = [
-    { source: "ddg", results_count: 8, latency_ms: 320 },
+    { source: "duckduckgo", results_count: 8, latency_ms: 320 },
     { source: "reddit", results_count: 5, latency_ms: 450 },
     { source: "hackernews", results_count: 3, latency_ms: 280 },
     { source: "arxiv", results_count: 4, latency_ms: 620 },
@@ -214,13 +212,13 @@ async function* generateMockEvents(
   });
 }
 
-export function createMockResponse(body: unknown): Response {
+export function createMockResponse(): Response {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of generateMockEvents(body)) {
+        for await (const chunk of generateMockEvents()) {
           controller.enqueue(encoder.encode(chunk));
         }
         controller.close();
